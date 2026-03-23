@@ -43,6 +43,8 @@ class CreateMixIn:
     @with_repository(compatibility=(Manifest.Operation.WRITE,))
     def do_create(self, args, repository, manifest):
         """Creates a new archive."""
+        if args.jobs < 1:
+            raise CommandError("--jobs must be >= 1")
         key = manifest.key
         matcher = PatternMatcher(fallback=True)
         matcher.add_inclexcl(args.patterns)
@@ -979,6 +981,16 @@ class CreateMixIn:
             default=CompressionSpec("lz4"),
             action=Highlander,
             help="select compression algorithm, see the output of the " '"borg help compression" command for details.',
+        )
+        archive_group.add_argument(
+            "-j",
+            "--jobs",
+            metavar="N",
+            dest="jobs",
+            type=int,
+            default=os.cpu_count() or 1,
+            action=Highlander,
+            help="set processing jobs for Rust pipeline backend (default: nCPUs, -j1 = strict serial)",
         )
         archive_group.add_argument(
             "--hostname",

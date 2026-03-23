@@ -35,7 +35,7 @@ def repo(request, cmd_fixture, repo_url):
 
 @pytest.fixture(scope="session", params=["zeros", "random"])
 def testdata(request, tmpdir_factory):
-    count, size = 10, 1000 * 1000
+    count, size = 1, 64 * 1024 * 1024
     assert size <= len(zeros)
     p = tmpdir_factory.mktemp("data")
     data_type = request.param
@@ -72,9 +72,16 @@ def test_create_none(benchmark, cmd_fixture, repo, testdata):
     assert result == 0
 
 
-def test_create_lz4(benchmark, cmd_fixture, repo, testdata):
+def test_create_zstd(benchmark, cmd_fixture, repo, testdata):
     result, out = benchmark.pedantic(
-        cmd_fixture, (f"--repo={repo}", "create", "--compression", "lz4", "test", testdata)
+        cmd_fixture, (f"--repo={repo}", "create", "--compression", "zstd,3", "test", testdata)
+    )
+    assert result == 0
+
+
+def test_create_lzma(benchmark, cmd_fixture, repo, testdata):
+    result, out = benchmark.pedantic(
+        cmd_fixture, (f"--repo={repo}", "create", "--compression", "lzma,6", "test", testdata)
     )
     assert result == 0
 

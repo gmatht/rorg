@@ -130,6 +130,8 @@ def with_repository(
                     kwargs["manifest"] = manifest_
                     if "compression" in args:
                         manifest_.repo_objs.compressor = args.compression.compressor
+                    if hasattr(args, "jobs"):
+                        manifest_.repo_objs.jobs = args.jobs
                     if secure:
                         assert_secure(repository, manifest_)
                 if cache:

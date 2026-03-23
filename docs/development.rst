@@ -273,6 +273,12 @@ virtual env and run::
 
   pip install -r requirements.d/development.lock.txt
 
+Rust pipeline migration notes (experimental)
+--------------------------------------------
+
+For the in-progress Rust `compress -> encrypt` migration toggles and jobs control,
+see ``docs/misc/rust_pipeline.rst``.
+
 
 This project utilizes pre-commit to format and lint code before it is committed.
 Although pre-commit is installed when running the command above, the pre-commit hooks

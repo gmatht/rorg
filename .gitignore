@@ -33,3 +33,4 @@ coverage.xml
 test-results.xml
 .vagrant
 .DS_Store
+.venv-wsl

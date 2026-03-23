@@ -7,6 +7,7 @@ from .constants import *  # NOQA
 from .helpers import msgpack, workarounds
 from .helpers.errors import IntegrityError
 from .compress import Compressor, LZ4_COMPRESSOR, get_compressor
+from . import rust_bridge
 
 # Workaround for lost passphrase or key in "authenticated" or "authenticated-blake2" mode
 AUTHENTICATED_NO_KEY = "authenticated_no_key" in workarounds
@@ -30,6 +31,7 @@ class RepoObj:
         # Some commands write new chunks (e.g. rename) but don't take a --compression argument. This duplicates
         # the default used by those commands who do take a --compression argument.
         self.compressor = LZ4_COMPRESSOR
+        self.jobs = None
 
     def id_hash(self, data: bytes) -> bytes:
         return self.key.id_hash(data)
@@ -54,7 +56,27 @@ class RepoObj:
         assert compress or size is not None and ctype is not None and clevel is not None
         if compress:
             assert size is None or size == len(data)
-            meta, data_compressed = self.compressor.compress(meta, data)
+            data_bytes = bytes(data) if not isinstance(data, bytes) else data
+            if rust_bridge.rust_enabled() and rust_bridge.rust_combined_enabled():
+                combined = rust_bridge.compress_encrypt(id, meta, data_bytes, jobs=self.jobs)
+                if combined is not None:
+                    meta, data_compressed, data_encrypted, meta_packed = combined
+                    if isinstance(meta_packed, bytes):
+                        meta_encrypted = self.key.encrypt(id, meta_packed)
+                        hdr = self.ObjHeader(
+                            len(meta_encrypted),
+                            len(data_encrypted),
+                            xxh64(meta_encrypted).digest(),
+                            xxh64(data_encrypted).digest(),
+                        )
+                        return self.obj_header.pack(*hdr) + meta_encrypted + data_encrypted
+            rust_compressed = None
+            if rust_bridge.rust_enabled() and rust_bridge.rust_compress_enabled():
+                rust_compressed = rust_bridge.compress(meta, data_bytes, jobs=self.jobs)
+            if rust_compressed is not None:
+                meta, data_compressed = rust_compressed
+            else:
+                meta, data_compressed = self.compressor.compress(meta, data)
         else:
             assert isinstance(size, int)
             meta["size"] = size
@@ -64,7 +86,10 @@ class RepoObj:
             meta["clevel"] = clevel
             data_compressed = data  # is already compressed, is NOT prefixed by type/level bytes
             meta["csize"] = len(data_compressed)
-        data_encrypted = self.key.encrypt(id, data_compressed)
+        rust_encrypted = None
+        if rust_bridge.rust_enabled() and rust_bridge.rust_encrypt_enabled():
+            rust_encrypted = rust_bridge.encrypt(id, data_compressed, jobs=self.jobs)
+        data_encrypted = rust_encrypted if rust_encrypted is not None else self.key.encrypt(id, data_compressed)
         meta_packed = msgpack.packb(meta)
         meta_encrypted = self.key.encrypt(id, meta_packed)
         hdr = self.ObjHeader(
