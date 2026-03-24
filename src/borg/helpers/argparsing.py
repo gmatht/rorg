@@ -94,6 +94,10 @@ the subcommand namespace and the outer (top-level) default flows through
 unchanged.
 """
 
+import difflib
+import re
+import shlex
+import sys
 from typing import Any
 
 # here are the only imports from argparse and jsonargparse,
@@ -103,11 +107,115 @@ from jsonargparse import ArgumentParser as _ArgumentParser  # we subclass that t
 from jsonargparse import Namespace, ActionSubCommands, SUPPRESS, REMAINDER  # noqa: F401
 from jsonargparse.typing import register_type, PositiveInt  # noqa: F401
 
+# Borg 1.x / informal names -> borg2 top-level subcommand (same list as parser choices targets).
+_TOP_COMMAND_SYNONYMS = {
+    "init": "repo-create",
+    "rcreate": "repo-create",
+    "repocreate": "repo-create",
+    "rm": "delete",
+    "clean": "compact",
+    "unrm": "undelete",
+    "undel": "undelete",
+    "restore": "undelete",
+}
+
+# Example line after 'Maybe you meant `<canonical>` not `<typed>`:\n\t' (placeholders intentionally generic).
+_TOP_COMMAND_EXAMPLES = {
+    "repo-create": "borg -r REPO repo-create -e repokey-aes-ocb",
+    "delete": "borg -r REPO delete ARCHIVE_OR_AID",
+    "compact": "borg -r REPO compact",
+    "undelete": "borg -r REPO undelete …",
+    "list": "borg -r REPO list ARCHIVE",
+}
+
+
+def _argv_tail_after_invalid_choice(invalid: str) -> list[str]:
+    """Tokens after the invalid top-level subcommand in sys.argv, if any."""
+    try:
+        idx = sys.argv.index(invalid)
+    except ValueError:
+        return []
+    return sys.argv[idx + 1 :]
+
+
+def _apply_argv_tail_to_example(canonical: str, example: str, argv_tail: list[str]) -> str:
+    """Replace generic placeholders with argv tokens the user actually typed after the bad command."""
+    if not argv_tail:
+        return example
+    tail = " ".join(shlex.quote(a) for a in argv_tail)
+    if canonical == "delete" and "ARCHIVE_OR_AID" in example:
+        return example.replace("ARCHIVE_OR_AID", tail)
+    if canonical == "list" and "ARCHIVE" in example:
+        return example.replace("ARCHIVE", tail)
+    if canonical == "undelete" and "…" in example:
+        return example.replace("…", tail)
+    return example
+
 
 class ArgumentParser(_ArgumentParser):
     # the borg code always uses RawDescriptionHelpFormatter and add_help=False:
     def __init__(self, *args, formatter_class=RawDescriptionHelpFormatter, add_help=False, **kwargs):
         super().__init__(*args, formatter_class=formatter_class, add_help=add_help, **kwargs)
+
+    def _top_command_choice_hint(self, message: str) -> str | None:
+        match = re.search(r"invalid choice: '([^']+)' \(choose from ([^)]+)\)", message)
+        if not match:
+            return None
+        invalid = match.group(1)
+        choices = [choice.strip().strip("'\"") for choice in match.group(2).split(",")]
+        canonical = _TOP_COMMAND_SYNONYMS.get(invalid)
+        if canonical is None:
+            candidates = difflib.get_close_matches(invalid, choices, n=1, cutoff=0.6)
+            if not candidates:
+                return None
+            canonical = candidates[0]
+        if canonical == invalid:
+            return None
+        example = _TOP_COMMAND_EXAMPLES.get(canonical, f"borg -r REPO {canonical}")
+        example = _apply_argv_tail_to_example(
+            canonical, example, _argv_tail_after_invalid_choice(invalid)
+        )
+        return f"Maybe you meant `{canonical}` not `{invalid}`:\n\t{example}"
+
+    def _common_fix_hints(self, message: str) -> list[str]:
+        hints = []
+        if "missing repository" in message.lower():
+            hints.append("Set the repository via --repo REPO or BORG_REPO.")
+        if "list.name is none" in message.lower() or ("list.name" in message and "is None" in message):
+            hints.append("For 'borg list', set repository via -r/--repo or BORG_REPO and pass an archive name.")
+        if "repo::archive" in message or "::archive" in message:
+            hints.append("Borg 2 uses --repo/BORG_REPO and separate archive arguments.")
+        if "invalid choice" in message and "<command>" in message:
+            cmd_hint = self._top_command_choice_hint(message)
+            if cmd_hint:
+                hints.append(cmd_hint)
+            hints.append("Run 'borg help' to list valid borg2 commands.")
+        return hints
+
+    def error(self, message, *args, **kwargs):
+        message = str(message)
+        if "Option 'repo-create.encryption' is required but not provided" in message:
+            from ..crypto.key import key_argument_names
+
+            modes = key_argument_names()
+            mode_list = ", ".join(modes)
+            message = (
+                f"{message}\n"
+                "Use -e/--encryption to choose a mode, for example: -e repokey-aes-ocb\n"
+                f"Available encryption modes: {mode_list}"
+            )
+        if "Option 'list.paths' is required but not provided" in message:
+            message = (
+                f"{message}\n"
+                "borg list requires an archive NAME to list contents.\n"
+                "Common fixes:\n"
+                "- Provide archive name: borg list NAME\n"
+                "- To list archives in a repository, use: borg -r REPO repo-list"
+            )
+        common_hints = self._common_fix_hints(message)
+        if common_hints:
+            message = f"{message}\nCommon fixes:\n- " + "\n- ".join(common_hints)
+        super().error(message, *args, **kwargs)
 
 
 def flatten_namespace(ns: Any) -> Namespace:
