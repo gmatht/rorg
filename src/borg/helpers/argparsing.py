@@ -236,6 +236,31 @@ def _argv_tail_after_invalid_choice(invalid: str) -> list[str]:
     return sys.argv[idx + 1 :]
 
 
+def _argv_display_for_hint(argv: list[str]) -> list[str]:
+    """Normalize argv to a readable `borg ...` line when launched via python -m or a borg binary."""
+    if len(argv) >= 3 and os.path.basename(argv[0]).lower().startswith("python") and argv[1] == "-m" and argv[2] == "borg":
+        return ["borg"] + argv[3:]
+    if len(argv) >= 1 and os.path.basename(argv[0]).lower() in ("borg", "borg.exe"):
+        return ["borg"] + argv[1:]
+    return list(argv)
+
+
+def _corrected_command_line_for_invalid_subcommand(invalid: str, canonical: str) -> str | None:
+    """Replace invalid with canonical in sys.argv; keep all other tokens (same order)."""
+    try:
+        idx = sys.argv.index(invalid)
+    except ValueError:
+        return None
+    if idx < 1:
+        return None
+    argv = list(sys.argv)
+    argv[idx] = canonical
+    display = _argv_display_for_hint(argv)
+    if not display:
+        return None
+    return " ".join(shlex.quote(a) for a in display)
+
+
 def _apply_argv_tail_to_example(canonical: str, example: str, argv_tail: list[str]) -> str:
     """Replace generic placeholders with argv tokens the user actually typed after the bad command."""
     if not argv_tail:
