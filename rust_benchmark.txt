@@ -1,0 +1,1408 @@
+## BENCHMARKS ##
+
+Repository: /mnt/d/GitHub/borg/local/out3
+Archive name: ::test1
+Archive fingerprint: 3d8f9336112372153ae7bb1a22b3c24eb64053684c8792ddc74a138bce138cae
+Time (start): Tue, 2026-03-24 17:18:31 +0800
+Time (end):   Tue, 2026-03-24 17:18:42 +0800
+Duration: 11.31 seconds
+Number of files: 1
+Original size: 67.11 MB
+Deduplicated size: 67.11 MB
+
+-- LZMA,1 --
+
+Upstream Borg2 lzma,1:
+real    0m14.793s
+user    0m12.076s
+sys     0m0.098s
+
+Rorg.sh lzma,1:
+real    0m5.009s
+user    0m22.315s
+sys     0m0.524s
+
+lzma -1:
+
+real    0m13.765s
+user    0m13.011s
+sys     0m0.131s
+
+* Rorg speed up 2.748x *
+
+-- LZMA,9 64MB --
+
+Rorg.sh lzma,9:
+real    0m12.545s
+user    1m18.398s  (78s)
+sys     0m1.658s
+
+
+lzma -9 < local/in/hexdump64M.txt | wc -c
+28162798
+
+real    1m38.537s
+user    1m34.659s
+sys     0m0.805s
+
+/usr/bin/borg2 lzma,9:
+
+real    0m46.003s
+user    0m42.590s
+sys     0m0.371s
+
+(hmm, why is `borg2` faster than `lzma -9`? Is lzma faster on smaller chunks?)
+
+* Rorg speedup 6.249x *
+
+-- LZMA,1 640MB should be enough for anyone. --
+
+Rorg.sh LZMA,1:
+
+real    0m29.171s
+user    3m9.286s
+sys     0m1.123s
+
+# time lzma -1 < local/in640/hexdump640M.txt | pv > /dev/null
+ 313MiB 0:02:28 [2.11MiB/s] [                                                                                                                                                                 <=>    ]
+
+real    2m39.907s
+user    2m19.922s
+sys     0m3.206s
+
+# export BORG_REPO=/mnt/d/GitHub/borg/local/out5 ; borg2 rcreate -e none ; time /usr/bin/borg2 create --progress --stats ::test1 local/in640/ -C lzma,1
+
+real    1m33.260s (93.260s)
+user    1m30.346s
+sys     0m0.262s
+
+* Rorg speedup 3.197x *
+
+Prior to this test were run from WSL on D:\ . Next test section was run in /tmp
+
+-- LZMA,9 640MB --
+
+root@PC:/tmp/borg# export BORG_REPO=/tmp/borg/out9 ; /mnt/d/GitHub/borg/rorg.sh repo-create -e none ; time /mnt/d/GitHub/borg/rorg.sh create --progress --stats --rust-stats ::test1 in/ -C lzma,9
+
+real    1m10.139s (70.139s)
+user    11m53.896s
+sys     0m8.117s
+
+root@PC:/tmp/borg# export BORG_REPO=/tmp/borg/outA ; /usr/bin/borg2 rcreate -e none ; time /usr/bin/borg2 create --progress --stats ::test1 in/ -C lzma,9
+
+real    7m3.159s (423.159s) 
+user    6m58.665s
+sys     0m3.335s
+
+Rorg: 6.033x speedup
+
+-- lz4 640MB --
+# export BORG_REPO=/tmp/borg/outB ; /usr/bin/borg2 rcreate -e none ; time /usr/bin/borg2 create --progress --stats ::test1 in/ -C lz4
+
+real    0m6.604s
+user    0m4.757s
+sys     0m0.990s
+
+# export BORG_REPO=/tmp/borg/outC ; /mnt/d/GitHub/borg/rorg.sh repo-create -e none ; time /mnt/d/GitHub/borg/rorg.sh create --progress --stats --rust-stats ::test1 in/ -C lz4
+
+real    0m15.726s
+user    0m16.169s
+sys     0m1.507s
+
+Rorg: 0.4199x "speedup"
+
+-- Benchmark System --
+cat /proc/cpuinfo | grep model.name | tee >(head -n1) >(wc -l|(read n; echo nThread: $n)) > /dev/null; sleep 1
+model name      : Intel(R) Core(TM) i7-10875H CPU @ 2.30GHz
+nThread: 16
+
+Rorg from commit 481f2c8719268288d58d00c850332ef1e90c152c
+
+(8 Cpus)
+
+Setup:
+hexdump < /dev/urandom | dd bs=1024 count=640K | pv > local/in640/hexdump640M.txt
+hexdump < /dev/urandom | dd bs=1024 count=64K | pv > local/in/hexdump64M.txt
+
+Then e.g.
+export BORG_REPO=/mnt/d/GitHub/borg/local/out5 ; borg2 rcreate -e none ; time /usr/bin/borg2 create --progress --stats ::test1 local/in640/ -C lzma,1
+
+------------------
+
+root@PC:/mnt/d/GitHub/borg# borg delete ::test1 ; borg compact ; time ./rorg.sh create --progress --stats --rust-stats ::test1 local/in/ -C lzma,1
+Done. Run "borg compact" to free space.
+Repository: /mnt/d/GitHub/borg/local/out
+Archive name: ::test1
+Archive fingerprint: 4880d01c597d908be95b5df77a5c5bd5cf8a75f6e131f1999978d0bfdfa551ed
+Time (nominal): Tue, 2026-03-24 16:44:57 +0800
+Time (start):   Tue, 2026-03-24 16:44:57 +0800
+Time (end):     Tue, 2026-03-24 16:45:00 +0800
+Duration: 3.238 seconds
+Number of files: 1
+Original size: 67.11 MB
+Deduplicated size: 418 B
+Time spent in hashing: 0.224 seconds
+Time spent in chunking: 1.560 seconds
+Added files: 1
+Unchanged files: 0
+Modified files: 0
+Error files: 0
+Files changed while reading: 0
+Bytes read from remote: 0
+Bytes sent to remote: 0
+Rust runtime:
+pipeline=1
+compress=1
+encrypt=0
+combined=0
+chunker=0
+Rust Concurrency Stats:
+Active time (ms): 0.000
+Average tasks in flight: 0.000
+Maximum tasks in flight: 0
+Saving files cache
+Saving chunks cache
+Saving cache config
+
+
+real    0m5.009s
+user    0m22.315s
+sys     0m0.524s
+root@PC:/mnt/d/GitHub/borg# borg delete ::test1 ; borg compact ; time ./rorg.sh create --progress --stats --rust-stats ::test1 local/in/ -C lzma,9
+Done. Run "borg compact" to free space.
+Repository: /mnt/d/GitHub/borg/local/out
+Archive name: ::test1
+Archive fingerprint: 84419f744f59f0e5e5723dd3ec47841a99a36dc0a207d31ffca368ab753f8fcf
+Time (nominal): Tue, 2026-03-24 16:46:06 +0800
+Time (start):   Tue, 2026-03-24 16:46:06 +0800
+Time (end):     Tue, 2026-03-24 16:46:14 +0800
+Duration: 7.867 seconds
+Number of files: 1
+Original size: 67.11 MB
+Deduplicated size: 418 B
+Time spent in hashing: 0.427 seconds
+Time spent in chunking: 1.754 seconds
+Added files: 1
+Unchanged files: 0
+Modified files: 0
+Error files: 0
+Files changed while reading: 0
+Bytes read from remote: 0
+Bytes sent to remote: 0
+Rust runtime:
+pipeline=1
+compress=1
+encrypt=0
+combined=0
+chunker=0
+Rust Concurrency Stats:
+Active time (ms): 0.000
+Average tasks in flight: 0.000
+Maximum tasks in flight: 0
+Saving files cache
+Saving chunks cache
+Saving cache config
+
+
+real    0m12.545s
+user    1m18.398s
+sys     0m1.658s
+root@PC:/mnt/d/GitHub/borg# borg delete ::test1 ; borg compact ; time borg.sh create --progress --stats --rust-stats ::test1 local/in/ -C lzma,9
+Done. Run "borg compact" to free space.
+borg.sh: command not found
+
+real    0m1.197s
+user    0m0.173s
+sys     0m0.057s
+root@PC:/mnt/d/GitHub/borg# borg delete ::test1 ; borg compact ; time borg create --progress --stats --rust-stats ::test1 local/in/ -C lzma,9
+Command error: ['::test1'] needed to match precisely one archive, but matched 0.
+Repository: /mnt/d/GitHub/borg/local/out
+Archive name: ::test1
+Archive fingerprint: 8aceff6d828c1b90462e479445287c744a3706652afa4ab3916cd173c1f7731a
+Time (nominal): Tue, 2026-03-24 16:46:44 +0800
+Time (start):   Tue, 2026-03-24 16:46:44 +0800
+Time (end):     Tue, 2026-03-24 16:46:44 +0800
+Duration: 0.646 seconds
+Number of files: 1
+Original size: 67.11 MB
+Deduplicated size: 398 B
+Time spent in hashing: 0.151 seconds
+Time spent in chunking: 0.453 seconds
+Added files: 1
+Unchanged files: 0
+Modified files: 0
+Error files: 0
+Files changed while reading: 0
+Bytes read from remote: 0
+Bytes sent to remote: 0
+Rust runtime:
+pipeline=0
+compress=0
+encrypt=0
+combined=0
+chunker=0
+Rust Concurrency Stats:
+Active time (ms): 0.000
+Average tasks in flight: 0.000
+Maximum tasks in flight: 0
+Saving files cache
+Saving chunks cache
+Saving cache config
+
+
+real    0m2.284s
+user    0m0.935s
+sys     0m0.130s
+root@PC:/mnt/d/GitHub/borg# borg delete ::test1 ; borg compact ; time borg create --progress --stats --rust-stats ::test1 local/in/ -C lzma,9
+Done. Run "borg compact" to free space.
+Repository: /mnt/d/GitHub/borg/local/out
+Archive name: ::test1
+Archive fingerprint: 840d827f450db7546baf4389964a7af63f8f0d01384138d78166d16a681d5858
+Time (nominal): Tue, 2026-03-24 16:48:18 +0800
+Time (start):   Tue, 2026-03-24 16:48:18 +0800
+Time (end):     Tue, 2026-03-24 16:48:18 +0800
+Duration: 0.601 seconds
+Number of files: 1
+Original size: 67.11 MB
+Deduplicated size: 398 B
+Time spent in hashing: 0.145 seconds
+Time spent in chunking: 0.419 seconds
+Added files: 1
+Unchanged files: 0
+Modified files: 0
+Error files: 0
+Files changed while reading: 0
+Bytes read from remote: 0
+Bytes sent to remote: 0
+Rust runtime:
+pipeline=0
+compress=0
+encrypt=0
+combined=0
+chunker=0
+Rust Concurrency Stats:
+Active time (ms): 0.000
+Average tasks in flight: 0.000
+Maximum tasks in flight: 0
+Saving files cache
+Saving chunks cache
+Saving cache config
+
+
+real    0m2.256s
+user    0m0.868s
+sys     0m0.184s
+root@PC:/mnt/d/GitHub/borg# borg delete ::test1 ; borg compact ; time ./rorg.sh create --progress --stats --rust-stats ::test1 local/in/ -C lzma,9
+Done. Run "borg compact" to free space.
+Repository: /mnt/d/GitHub/borg/local/out
+Archive name: ::test1
+Archive fingerprint: 2c9f1d892b11237b931e5f478eb7cbf7713556174ed74044e822fabd6f64b8b4
+Time (nominal): Tue, 2026-03-24 16:48:49 +0800
+Time (start):   Tue, 2026-03-24 16:48:49 +0800
+Time (end):     Tue, 2026-03-24 16:48:57 +0800
+Duration: 7.912 seconds
+Number of files: 1
+Original size: 67.11 MB
+Deduplicated size: 418 B
+Time spent in hashing: 0.364 seconds
+Time spent in chunking: 1.945 seconds
+Added files: 1
+Unchanged files: 0
+Modified files: 0
+Error files: 0
+Files changed while reading: 0
+Bytes read from remote: 0
+Bytes sent to remote: 0
+Rust runtime:
+pipeline=1
+compress=1
+encrypt=0
+combined=0
+chunker=0
+Rust Concurrency Stats:
+Active time (ms): 0.000
+Average tasks in flight: 0.000
+Maximum tasks in flight: 0
+Saving files cache
+Saving chunks cache
+Saving cache config
+
+
+real    0m9.611s
+user    1m19.253s
+sys     0m1.547s
+root@PC:/mnt/d/GitHub/borg# borg delete ::test1 ; borg compact ; time borg create --progress --stats --rust-stats ::test1 local/in/ -C lzma,9
+Done. Run "borg compact" to free space.
+Repository: /mnt/d/GitHub/borg/local/out
+Archive name: ::test1
+Archive fingerprint: b75503598fc3304f997c8098f51b83535632b2975b0055e8a560029f7b537770
+Time (nominal): Tue, 2026-03-24 16:49:37 +0800
+Time (start):   Tue, 2026-03-24 16:49:37 +0800
+Time (end):     Tue, 2026-03-24 16:49:38 +0800
+Duration: 0.617 seconds
+Number of files: 1
+Original size: 67.11 MB
+Deduplicated size: 398 B
+Time spent in hashing: 0.152 seconds
+Time spent in chunking: 0.424 seconds
+Added files: 1
+Unchanged files: 0
+Modified files: 0
+Error files: 0
+Files changed while reading: 0
+Bytes read from remote: 0
+Bytes sent to remote: 0
+Rust runtime:
+pipeline=0
+compress=0
+encrypt=0
+combined=0
+chunker=0
+Rust Concurrency Stats:
+Active time (ms): 0.000
+Average tasks in flight: 0.000
+Maximum tasks in flight: 0
+Saving files cache
+Saving chunks cache
+Saving cache config
+
+
+real    0m2.265s
+user    0m0.908s
+sys     0m0.177s
+root@PC:/mnt/d/GitHub/borg# borg delete ::test1 ; borg compact ; time borg create --progress --stats --rust-stats ::test1 local/in/ -C lzma,1
+Done. Run "borg compact" to free space.
+Repository: /mnt/d/GitHub/borg/local/out
+Archive name: ::test1
+Archive fingerprint: 8524b4e5897dae17a274002aba74d6621c0f9eb725c17bc3b76a2018d37478e9
+Time (nominal): Tue, 2026-03-24 16:50:16 +0800
+Time (start):   Tue, 2026-03-24 16:50:16 +0800
+Time (end):     Tue, 2026-03-24 16:50:17 +0800
+Duration: 0.620 seconds
+Number of files: 1
+Original size: 67.11 MB
+Deduplicated size: 398 B
+Time spent in hashing: 0.150 seconds
+Time spent in chunking: 0.438 seconds
+Added files: 1
+Unchanged files: 0
+Modified files: 0
+Error files: 0
+Files changed while reading: 0
+Bytes read from remote: 0
+Bytes sent to remote: 0
+Rust runtime:
+pipeline=0
+compress=0
+encrypt=0
+combined=0
+chunker=0
+Rust Concurrency Stats:
+Active time (ms): 0.000
+Average tasks in flight: 0.000
+Maximum tasks in flight: 0
+Saving files cache
+Saving chunks cache
+Saving cache config
+
+
+real    0m2.297s
+user    0m0.920s
+sys     0m0.130s
+root@PC:/mnt/d/GitHub/borg# apt install borg2
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+E: Unable to locate package borg2
+root@PC:/mnt/d/GitHub/borg# apt install borg
+borgbackup                 borgbackup-doc             borgbackup-is-borgbackup2  borgbackup2                borgbackup2-doc            borgmatic
+root@PC:/mnt/d/GitHub/borg# apt install borgbackup-is-borgbackup2
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+The following packages were automatically installed and are no longer required:
+  libdrm-nouveau2 libdrm-radeon1 libgit2-1.7 libgl1-amber-dri libglapi-mesa libhttp-parser2.9 libllvm17t64 libssh2-1t64 libstd-rust-1.75 libstd-rust-dev libxcb-dri2-0 python3-cliapp
+  python3-markdown python3-ttystatus python3-zombie-imp
+Use 'apt autoremove' to remove them.
+The following additional packages will be installed:
+  borgbackup2 python3-argon2 python3-msgpack python3-packaging
+Suggested packages:
+  borgbackup2-doc python-argon2-doc
+The following NEW packages will be installed:
+  borgbackup-is-borgbackup2 borgbackup2 python3-argon2 python3-msgpack python3-packaging
+0 upgraded, 5 newly installed, 0 to remove and 95 not upgraded.
+Need to get 1080 kB of archives.
+After this operation, 4460 kB of additional disk space will be used.
+Do you want to continue? [Y/n] y
+Get:1 https://mirror.aarnet.edu.au/pub/ubuntu/archive noble/universe amd64 python3-argon2 amd64 21.1.0-2build1 [21.0 kB]
+Get:2 https://mirror.aarnet.edu.au/pub/ubuntu/archive noble/main amd64 python3-msgpack amd64 1.0.3-3build2 [80.1 kB]
+Get:3 https://mirror.aarnet.edu.au/pub/ubuntu/archive noble/main amd64 python3-packaging all 24.0-1 [41.1 kB]
+Get:4 https://mirror.aarnet.edu.au/pub/ubuntu/archive noble/universe amd64 borgbackup2 amd64 2.0.0b8-2build2 [936 kB]
+Get:5 https://mirror.aarnet.edu.au/pub/ubuntu/archive noble/universe amd64 borgbackup-is-borgbackup2 amd64 2.0.0b8-2build2 [1588 B]
+Fetched 1080 kB in 1s (1341 kB/s)
+Selecting previously unselected package python3-argon2.
+(Reading database ... 243093 files and directories currently installed.)
+Preparing to unpack .../python3-argon2_21.1.0-2build1_amd64.deb ...
+Unpacking python3-argon2 (21.1.0-2build1) ...
+Selecting previously unselected package python3-msgpack.
+Preparing to unpack .../python3-msgpack_1.0.3-3build2_amd64.deb ...
+Unpacking python3-msgpack (1.0.3-3build2) ...
+Selecting previously unselected package python3-packaging.
+Preparing to unpack .../python3-packaging_24.0-1_all.deb ...
+Unpacking python3-packaging (24.0-1) ...
+Selecting previously unselected package borgbackup2.
+Preparing to unpack .../borgbackup2_2.0.0b8-2build2_amd64.deb ...
+Unpacking borgbackup2 (2.0.0b8-2build2) ...
+Selecting previously unselected package borgbackup-is-borgbackup2.
+Preparing to unpack .../borgbackup-is-borgbackup2_2.0.0b8-2build2_amd64.deb ...
+Unpacking borgbackup-is-borgbackup2 (2.0.0b8-2build2) ...
+Setting up python3-packaging (24.0-1) ...
+Setting up python3-argon2 (21.1.0-2build1) ...
+Setting up python3-msgpack (1.0.3-3build2) ...
+Setting up borgbackup2 (2.0.0b8-2build2) ...
+Setting up borgbackup-is-borgbackup2 (2.0.0b8-2build2) ...
+Processing triggers for man-db (2.12.0-4build2) ...
+root@PC:/mnt/d/GitHub/borg# which borg
+/usr/local/bin/borg
+root@PC:/mnt/d/GitHub/borg# /usr/bin/borg
+borg         borg2        borgbackup2  borgfs       borgfs2
+root@PC:/mnt/d/GitHub/borg# borg delete ::test1 ; borg compact ; time /usr/bin/borg2 create --progress --stats --rust-stats ::test1 local/in/ -C lzma,1
+Done. Run "borg compact" to free space.
+usage: borg2 [-V] [-h] [--critical] [--error] [--warning] [--info] [--debug] [--debug-topic TOPIC] [-p] [--iec] [--log-json] [--lock-wait SECONDS] [--bypass-lock] [--show-version] [--show-rc]
+             [--umask M] [--remote-path PATH] [--upload-ratelimit RATE] [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH] [--socket [PATH]] [-r REPO]
+             <command> ...
+borg2: error: unrecognized arguments: --rust-stats
+
+real    0m0.446s
+user    0m0.361s
+sys     0m0.053s
+root@PC:/mnt/d/GitHub/borg# borg delete ::test1 ; borg compact ; time /usr/bin/borg2 create --progress --stats ::test1 local/in/ -C lzma,1
+Command error: ['::test1'] needed to match precisely one archive, but matched 0.
+You do not have a supported version of the msgpack python package installed. Terminating.
+This should never happen as specific, supported versions are required by our pyproject.toml.
+Do not contact borgbackup support about this.
+Error: unsupported msgpack version
+
+real    0m0.509s
+user    0m0.412s
+sys     0m0.054s
+root@PC:/mnt/d/GitHub/borg# time lzma
+lzma          lzmadec.exe   lzmainfo      lzmainfo.exe
+root@PC:/mnt/d/GitHub/borg# time lzma
+lzma          lzmadec.exe   lzmainfo      lzmainfo.exe
+root@PC:/mnt/d/GitHub/borg# time lzma -9 <
+.editorconfig            .gitignore               AUTHORS                  README.rst               local/                   rust_benchmark.md
+.git/                    .mailmap                 Brewfile                 Rust.md                  pyproject.toml           scripts/
+.git-blame-ignore-revs   .pre-commit-config.yaml  CHANGES.rst              SECURITY.md              requirements.d/          setup.py
+.gitattributes           .readthedocs.yaml        LICENSE                  Vagrantfile              rorg.sh                  src/
+.github/                 .venv-wsl/               MANIFEST.in              docs/                    rust/
+root@PC:/mnt/d/GitHub/borg# time lzma -9 < local/in/hexdump64M.txt > /dev/null
+^C
+real    0m20.728s
+user    0m18.613s
+sys     0m0.120s
+
+root@PC:/mnt/d/GitHub/borg# time lzma -1 < local/in/hexdump64M.txt > /dev/null
+
+real    0m13.765s
+user    0m13.011s
+sys     0m0.131s
+root@PC:/mnt/d/GitHub/borg# ls
+AUTHORS   CHANGES.rst  MANIFEST.in  Rust.md      Vagrantfile  local           requirements.d  rust               scripts   src
+Brewfile  LICENSE      README.rst   SECURITY.md  docs         pyproject.toml  rorg.sh         rust_benchmark.md  setup.py
+root@PC:/mnt/d/GitHub/borg# ls local/
+in/         out/        rorg.shbak
+root@PC:/mnt/d/GitHub/borg# ls local/out/
+archives  cache  config  data  locks
+root@PC:/mnt/d/GitHub/borg# du -h local/out/
+0       local/out/archives
+4.0K    local/out/cache
+0       local/out/config
+1.1M    local/out/data/04/7c
+1.1M    local/out/data/04
+2.1M    local/out/data/06/53
+2.1M    local/out/data/06
+0       local/out/data/07/59
+0       local/out/data/07
+0       local/out/data/09/0b
+0       local/out/data/09
+412K    local/out/data/0e/91
+412K    local/out/data/0e
+884K    local/out/data/13/de
+884K    local/out/data/13
+1.3M    local/out/data/16/a2
+1.3M    local/out/data/16
+0       local/out/data/19/69
+0       local/out/data/19
+920K    local/out/data/20/c1
+920K    local/out/data/20
+260K    local/out/data/25/59
+260K    local/out/data/25
+0       local/out/data/2b/d4
+0       local/out/data/2b
+0       local/out/data/2c/9f
+0       local/out/data/2c
+928K    local/out/data/41/22
+928K    local/out/data/41
+584K    local/out/data/47/51
+584K    local/out/data/47
+0       local/out/data/48/80
+0       local/out/data/48
+1.5M    local/out/data/4c/af
+1.5M    local/out/data/4c
+2.8M    local/out/data/56/2e
+2.8M    local/out/data/56
+436K    local/out/data/67/65
+0       local/out/data/67/7b
+436K    local/out/data/67
+680K    local/out/data/68/35
+680K    local/out/data/68
+712K    local/out/data/6c/81
+712K    local/out/data/6c
+532K    local/out/data/77/74
+532K    local/out/data/77
+2.4M    local/out/data/7a/ec
+2.4M    local/out/data/7a
+0       local/out/data/7b/08
+0       local/out/data/7b
+444K    local/out/data/7d/19
+444K    local/out/data/7d
+0       local/out/data/83/cb
+0       local/out/data/83
+0       local/out/data/84/0d
+0       local/out/data/84/41
+0       local/out/data/84
+0       local/out/data/85/24
+1.5M    local/out/data/85/2e
+1.5M    local/out/data/85
+0       local/out/data/8a/ce
+0       local/out/data/8a
+872K    local/out/data/8c/8e
+872K    local/out/data/8c
+0       local/out/data/8d/fd
+0       local/out/data/8d
+1.2M    local/out/data/93/2d
+0       local/out/data/93/e3
+1.2M    local/out/data/93
+0       local/out/data/95/ca
+0       local/out/data/95
+1.3M    local/out/data/9c/de
+1.3M    local/out/data/9c
+980K    local/out/data/a9/60
+980K    local/out/data/a9
+0       local/out/data/b2/9d
+0       local/out/data/b2
+256K    local/out/data/b3/6d
+256K    local/out/data/b3
+0       local/out/data/b4/08
+0       local/out/data/b4
+0       local/out/data/b5/08
+0       local/out/data/b5
+0       local/out/data/b6/c5
+0       local/out/data/b6
+0       local/out/data/b7/55
+0       local/out/data/b7
+4.0K    local/out/data/b9/8f
+4.0K    local/out/data/b9
+324K    local/out/data/ba/f4
+324K    local/out/data/ba
+2.6M    local/out/data/bb/23
+2.6M    local/out/data/bb
+556K    local/out/data/c0/45
+556K    local/out/data/c0
+0       local/out/data/cd/63
+0       local/out/data/cd
+1.7M    local/out/data/e6/13
+1.7M    local/out/data/e6
+1.2M    local/out/data/e9/1d
+1.2M    local/out/data/e9
+416K    local/out/data/f2/18
+416K    local/out/data/f2
+1.4M    local/out/data/f3/84
+1.4M    local/out/data/f3
+32M     local/out/data
+0       local/out/locks
+32M     local/out/
+root@PC:/mnt/d/GitHub/borg# time lzma -1 < local/in/hexdump64M.txt | wc -c
+32833515
+
+real    0m13.667s
+user    0m12.953s
+sys     0m0.239s
+root@PC:/mnt/d/GitHub/borg#  mkdir local/mnt
+root@PC:/mnt/d/GitHub/borg# borg mount ::test1 local/mnt/
+Runtime error: ::test1: Mountpoint must be an **existing directory**
+root@PC:/mnt/d/GitHub/borg# borg mount local/mnt/ ::test1
+Warning: The mounted archive is capable of containing symlinks that point outside the archive tree. When following such symlinks you may see files and directories within the mountpoint that do not reflect the archive content.
+root@PC:/mnt/d/GitHub/borg# ls local/mnt/
+::test_conc
+root@PC:/mnt/d/GitHub/borg# ls local/mnt/\:\:test_conc/
+root@PC:/mnt/d/GitHub/borg# ls local/mnt/\:\:test_conc/ -lh
+total 0
+root@PC:/mnt/d/GitHub/borg# ls local/mnt/ -lh
+total 0
+drwxr-xr-x 1 root root 0 Mar 24 16:42 ::test_conc
+root@PC:/mnt/d/GitHub/borg# time lzma -9 < local/in/hexdump64M.txt | wc -c
+28162798
+
+real    1m38.537s
+user    1m34.659s
+sys     0m0.805s
+root@PC:/mnt/d/GitHub/borg# borg ls ::test1
+usage: borg [--config CONFIG] [--print_config[=flags]] [-V] [--cockpit] [-h] [--critical] [--error] [--warning] [--info] [--debug] [--debug-topic TOPIC] [-p] [--iec] [--log-json]
+            [--lock-wait SECONDS] [--show-version] [--show-rc] [--umask M] [--remote-path PATH] [--upload-ratelimit RATE] [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH]
+            [--socket [PATH]] [-r REPO]
+            <command> ...
+tip: For details of accepted options run: borg --help
+error: argument <command>: invalid choice: 'ls' (choose from 'analyze', 'benchmark', 'check', 'compact', 'completion', 'create', 'debug', 'delete', 'diff', 'extract', 'help', 'info', 'key', 'list', 'break-lock', 'with-lock', 'mount', 'umount', 'prune', 'repo-compress', 'repo-create', 'repo-delete', 'repo-info', 'repo-list', 'recreate', 'rename', 'repo-space', 'serve', 'tag', 'export-tar', 'import-tar', 'transfer', 'undelete', 'version')
+root@PC:/mnt/d/GitHub/borg# borg list ::test1
+Command error: ['::test1'] needed to match precisely one archive, but matched 0.
+root@PC:/mnt/d/GitHub/borg# borg list
+usage: borg [--config CONFIG] [--print_config[=flags]] [-V] [--cockpit] [-h] [--critical] [--error] [--warning] [--info] [--debug] [--debug-topic TOPIC] [-p] [--iec] [--log-json]
+            [--lock-wait SECONDS] [--show-version] [--show-rc] [--umask M] [--remote-path PATH] [--upload-ratelimit RATE] [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH]
+            [--socket [PATH]] [-r REPO]
+            <command> ...
+tip: For details of accepted options run: borg --help
+error: Option 'list.paths' is required but not provided or its value is None.
+root@PC:/mnt/d/GitHub/borg# borg list .
+Command error: ['.'] needed to match precisely one archive, but matched 0.
+root@PC:/mnt/d/GitHub/borg# borg list ::test_conc
+drwxrwxrwx root   root          0 Tue, 2026-03-24 15:04:11 +0800 local/in
+-rwxrwxrwx root   root   67108864 Tue, 2026-03-24 15:04:20 +0800 local/in/hexdump64M.txt
+root@PC:/mnt/d/GitHub/borg# borg delete ::test_conc
+Done. Run "borg compact" to free space.
+root@PC:/mnt/d/GitHub/borg# borg compact
+Failed to create/acquire the lock <Store(url='file:///mnt/d/GitHub/borg/local/out', levels=[('archives/', [0]), ('config/', [0]), ('cache/', [0]), ('locks/', [0]), ('data/', [2]), ('keys/', [0])])> (timeout).
+root@PC:/mnt/d/GitHub/borg# borg compact
+Failed to create/acquire the lock <Store(url='file:///mnt/d/GitHub/borg/local/out', levels=[('archives/', [0]), ('config/', [0]), ('cache/', [0]), ('locks/', [0]), ('data/', [2]), ('keys/', [0])])> (timeout).
+root@PC:/mnt/d/GitHub/borg# set | grep BORG
+BORG_REPO=/mnt/d/GitHub/borg/local/out
+root@PC:/mnt/d/GitHub/borg# BORG_REPO=/mnt/d/GitHub/borg/local/out2
+root@PC:/mnt/d/GitHub/borg# borg repo-create
+usage: borg [--config CONFIG] [--print_config[=flags]] [-V] [--cockpit] [-h] [--critical] [--error] [--warning] [--info] [--debug] [--debug-topic TOPIC] [-p] [--iec] [--log-json]
+            [--lock-wait SECONDS] [--show-version] [--show-rc] [--umask M] [--remote-path PATH] [--upload-ratelimit RATE] [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH]
+            [--socket [PATH]] [-r REPO]
+            <command> ...
+tip: For details of accepted options run: borg --help
+error: Option 'repo-create.encryption' is required but not provided or its value is None.
+root@PC:/mnt/d/GitHub/borg# borg repo-create -e none
+
+Reserve some repository storage space now for emergencies like 'disk full'
+by running:
+    borg repo-space --reserve 1G
+root@PC:/mnt/d/GitHub/borg# cat >> ui.md
+root@PC:/mnt/d/GitHub/borg# cat >> ui.md
+error: Option 'repo-create.encryption' is required but not provided or its value is None.
+root@PC:/mnt/d/GitHub/borg# borg repo-create -e none
+
+root@PC:/mnt/d/GitHub/borg# borg delete ::test1 ; borg compact ; time ./rorg.sh create --progress --stats --rust-stats ::test1 local/in/ -C lzma,1
+Command error: ['::test1'] needed to match precisely one archive, but matched 0.
+Repository: /mnt/d/GitHub/borg/local/out2
+Archive name: ::test1
+Archive fingerprint: aca0982bd5b38ad86f9b86c9bc0c8489c3b7136a6c15da88000bd0eddc66abf7
+Time (nominal): Tue, 2026-03-24 17:10:35 +0800
+Time (start):   Tue, 2026-03-24 17:10:35 +0800
+Time (end):     Tue, 2026-03-24 17:10:38 +0800
+Duration: 3.579 seconds
+Number of files: 1
+Original size: 67.11 MB
+Deduplicated size: 67.11 MB
+Time spent in hashing: 0.218 seconds
+Time spent in chunking: 1.614 seconds
+Added files: 1
+Unchanged files: 0
+Modified files: 0
+Error files: 0
+Files changed while reading: 0
+Bytes read from remote: 0
+Bytes sent to remote: 0
+Rust runtime:
+pipeline=1
+compress=1
+encrypt=0
+combined=0
+chunker=0
+Rust Concurrency Stats:
+Active time (ms): 1352.299
+Average tasks in flight: 15.500
+Maximum tasks in flight: 31
+Saving files cache
+Saving chunks cache
+Saving cache config
+
+
+real    0m5.338s
+user    0m24.207s
+sys     0m0.363s
+root@PC:/mnt/d/GitHub/borg# borg mount local/mnt/ ::test1
+Runtime error: local/mnt/: Mountpoint must be a **writable** directory
+root@PC:/mnt/d/GitHub/borg# borg mount local/mnt/
+Runtime error: local/mnt/: Mountpoint must be a **writable** directory
+root@PC:/mnt/d/GitHub/borg# mkdir local/mnt2
+root@PC:/mnt/d/GitHub/borg# borg mount local/mnt2
+Warning: The mounted archive is capable of containing symlinks that point outside the archive tree. When following such symlinks you may see files and directories within the mountpoint that do not reflect the archive content.
+root@PC:/mnt/d/GitHub/borg# ls local/mnt2/
+::test1
+root@PC:/mnt/d/GitHub/borg# ls local/mnt2/::test1
+local
+root@PC:/mnt/d/GitHub/borg# ls local/mnt2/::test1/local
+in
+root@PC:/mnt/d/GitHub/borg# ls local/mnt2/::test1/local/in
+hexdump64M.txt
+root@PC:/mnt/d/GitHub/borg# wc local/mnt2/::test1/local/in/hex*
+ 1398101 12582912 67108864 local/mnt2/::test1/local/in/hexdump64M.txt
+root@PC:/mnt/d/GitHub/borg# diff local/mnt2/::test1/local/in/hex* local/in/hexdump64M.txt
+root@PC:/mnt/d/GitHub/borg# ls /usr/local/
+NuSMV-2.7.1-linux64/ borg-linux-glibc231  cuda-12/             etc/                 include/             libexec/             n/                   share/
+bin/                 cuda/                cuda-12.6/           games/               lib/                 man/                 sbin/                src/
+root@PC:/mnt/d/GitHub/borg# mv /usr/local{,.bak}
+root@PC:/mnt/d/GitHub/borg# borg
+-bash: /usr/local/bin/borg: No such file or directory
+root@PC:/mnt/d/GitHub/borg# borg2
+usage: borg2 [-V] [-h] [--critical] [--error] [--warning] [--info] [--debug] [--debug-topic TOPIC] [-p] [--iec] [--log-json] [--lock-wait SECONDS] [--bypass-lock] [--show-version] [--show-rc]
+             [--umask M] [--remote-path PATH] [--upload-ratelimit RATE] [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH] [--socket [PATH]] [-r REPO]
+             <command> ...
+
+Borg - Deduplicated Backups
+
+options:
+  -V, --version         show version number and exit
+
+Common options:
+  -h, --help            show this help message and exit
+  --critical            work on log level CRITICAL
+  --error               work on log level ERROR
+  --warning             work on log level WARNING (default)
+  --info, -v, --verbose
+                        work on log level INFO
+  --debug               enable debug output, work on log level DEBUG
+  --debug-topic TOPIC   enable TOPIC debugging (can be specified multiple times). The logger path is borg.debug.<TOPIC> if TOPIC is not fully qualified.
+  -p, --progress        show progress information
+  --iec                 format using IEC units (1KiB = 1024B)
+  --log-json            Output one JSON object per log line instead of formatted text.
+  --lock-wait SECONDS   wait at most SECONDS for acquiring a repository/cache lock (default: 1).
+  --bypass-lock         Bypass locking mechanism
+  --show-version        show/log the borg version
+  --show-rc             show/log the return code (rc)
+  --umask M             set umask to M (local only, default: 0077)
+  --remote-path PATH    use PATH as borg executable on the remote (default: "borg")
+  --upload-ratelimit RATE
+                        set network upload rate limit in kiByte/s (default: 0=unlimited)
+  --upload-buffer UPLOAD_BUFFER
+                        set network upload buffer size in MiB. (default: 0=no buffer)
+  --debug-profile FILE  Write execution profile in Borg format into FILE. For local use a Python-compatible file can be generated by suffixing FILE with ".pyprof".
+  --rsh RSH             Use this command to connect to the 'borg serve' process (default: 'ssh')
+  --socket [PATH]       Use UNIX DOMAIN (IPC) socket at PATH for client/server communication with socket: protocol.
+  -r REPO, --repo REPO  repository to use
+
+required arguments:
+  <command>
+    benchmark           benchmark command
+    check               verify repository
+    compact             compact segment files / free space in repo
+    config              get and set configuration values
+    create              create backup
+    debug               debugging command (not intended for normal use)
+    delete              delete archive
+    diff                find differences in archive contents
+    extract             extract archive contents
+    info                show repository or archive information
+    key                 manage repository key
+    list                list archive contents
+    break-lock          break repository and cache locks
+    with-lock           run user command with lock held
+    mount               mount repository
+    umount              umount repository
+    prune               prune archives
+    rcompress           Repository (re-)compression
+    rcreate             create a new, empty repository
+    rdelete             delete repository
+    rinfo               show repository information
+    rlist               list repository contents
+    recreate            Re-create archives
+    rename              rename archive
+    serve               start repository server process
+    export-tar          create tarball from archive
+    import-tar          Create a backup archive from a tarball
+    transfer            transfer of archives from another repository
+    version             display borg client version / borg server version
+root@PC:/mnt/d/GitHub/borg# BORG_REPO=/mnt/d/GitHub/borg/local/out3
+root@PC:/mnt/d/GitHub/borg# borg2 repo-create -e none
+usage: borg2 [-V] [-h] [--critical] [--error] [--warning] [--info] [--debug] [--debug-topic TOPIC] [-p] [--iec] [--log-json] [--lock-wait SECONDS] [--bypass-lock] [--show-version] [--show-rc]
+             [--umask M] [--remote-path PATH] [--upload-ratelimit RATE] [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH] [--socket [PATH]] [-r REPO]
+             <command> ...
+borg2: error: argument <command>: invalid choice: 'repo-create' (choose from 'benchmark', 'check', 'compact', 'config', 'create', 'debug', 'delete', 'diff', 'extract', 'help', 'info', 'key', 'list', 'break-lock', 'with-lock', 'mount', 'umount', 'prune', 'rcompress', 'rcreate', 'rdelete', 'rinfo', 'rlist', 'recreate', 'rename', 'serve', 'export-tar', 'import-tar', 'transfer', 'version')
+root@PC:/mnt/d/GitHub/borg# borg repo-create -e none
+-bash: /usr/local/bin/borg: No such file or directory
+root@PC:/mnt/d/GitHub/borg# borg2 repo-create -e none
+usage: borg2 [-V] [-h] [--critical] [--error] [--warning] [--info] [--debug] [--debug-topic TOPIC] [-p] [--iec] [--log-json] [--lock-wait SECONDS] [--bypass-lock] [--show-version] [--show-rc]
+             [--umask M] [--remote-path PATH] [--upload-ratelimit RATE] [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH] [--socket [PATH]] [-r REPO]
+             <command> ...
+borg2: error: argument <command>: invalid choice: 'repo-create' (choose from 'benchmark', 'check', 'compact', 'config', 'create', 'debug', 'delete', 'diff', 'extract', 'help', 'info', 'key', 'list', 'break-lock', 'with-lock', 'mount', 'umount', 'prune', 'rcompress', 'rcreate', 'rdelete', 'rinfo', 'rlist', 'recreate', 'rename', 'serve', 'export-tar', 'import-tar', 'transfer', 'version')
+root@PC:/mnt/d/GitHub/borg# borg2 create -e none
+usage: borg2 create [-h] [--critical] [--error] [--warning] [--info] [--debug] [--debug-topic TOPIC] [-p] [--iec] [--log-json] [--lock-wait SECONDS] [--bypass-lock] [--show-version] [--show-rc]
+                    [--umask M] [--remote-path PATH] [--upload-ratelimit RATE] [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH] [--socket [PATH]] [-r REPO] [-n] [-s] [--list]
+                    [--filter STATUSCHARS] [--json] [--no-cache-sync] [--stdin-name NAME] [--stdin-user USER] [--stdin-group GROUP] [--stdin-mode M] [--content-from-command] [--paths-from-stdin]
+                    [--paths-from-command] [--paths-delimiter DELIM] [-e PATTERN] [--exclude-from EXCLUDEFILE] [--pattern PATTERN] [--patterns-from PATTERNFILE] [--exclude-caches]
+                    [--exclude-if-present NAME] [--keep-exclude-tags] [--exclude-nodump] [-x] [--numeric-ids] [--atime] [--noctime] [--nobirthtime] [--noflags] [--noacls] [--noxattrs] [--sparse]
+                    [--files-cache MODE] [--read-special] [--comment COMMENT] [--timestamp TIMESTAMP] [-c SECONDS] [--checkpoint-volume BYTES] [--chunker-params PARAMS] [-C COMPRESSION]
+                    NAME [PATH ...]
+borg2 create: error: the following arguments are required: NAME, PATH
+root@PC:/mnt/d/GitHub/borg# borg2 init -e none
+usage: borg2 [-V] [-h] [--critical] [--error] [--warning] [--info] [--debug] [--debug-topic TOPIC] [-p] [--iec] [--log-json] [--lock-wait SECONDS] [--bypass-lock] [--show-version] [--show-rc]
+             [--umask M] [--remote-path PATH] [--upload-ratelimit RATE] [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH] [--socket [PATH]] [-r REPO]
+             <command> ...
+borg2: error: argument <command>: invalid choice: 'init' (choose from 'benchmark', 'check', 'compact', 'config', 'create', 'debug', 'delete', 'diff', 'extract', 'help', 'info', 'key', 'list', 'break-lock', 'with-lock', 'mount', 'umount', 'prune', 'rcompress', 'rcreate', 'rdelete', 'rinfo', 'rlist', 'recreate', 'rename', 'serve', 'export-tar', 'import-tar', 'transfer', 'version')
+root@PC:/mnt/d/GitHub/borg# borg2 rcreate -e none
+root@PC:/mnt/d/GitHub/borg# borg delete ::test1 ; borg compact ; time borg2 create --progress --stats --rust-stats ::test1 local/in/ -C lzma,1
+-bash: /usr/local/bin/borg: No such file or directory
+-bash: /usr/local/bin/borg: No such file or directory
+usage: borg2 [-V] [-h] [--critical] [--error] [--warning] [--info] [--debug] [--debug-topic TOPIC] [-p] [--iec] [--log-json] [--lock-wait SECONDS] [--bypass-lock] [--show-version] [--show-rc]
+             [--umask M] [--remote-path PATH] [--upload-ratelimit RATE] [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH] [--socket [PATH]] [-r REPO]
+             <command> ...
+borg2: error: unrecognized arguments: --rust-stats
+
+real    0m0.330s
+user    0m0.304s
+sys     0m0.022s
+root@PC:/mnt/d/GitHub/borg# borg delete ::test1 ; borg compact ; time borg2 create --progress --stats ::test1 local/in/ -C lzma,1
+-bash: /usr/local/bin/borg: No such file or directory
+-bash: /usr/local/bin/borg: No such file or directory
+Initializing cache transaction: Reading config
+Initializing cache transaction: Reading chunks
+Initializing cache transaction: Reading files
+
+Saving files cache
+Saving chunks cache
+Saving cache config
+
+Repository: /mnt/d/GitHub/borg/local/out3
+Archive name: ::test1
+Archive fingerprint: 3d8f9336112372153ae7bb1a22b3c24eb64053684c8792ddc74a138bce138cae
+Time (start): Tue, 2026-03-24 17:18:31 +0800
+Time (end):   Tue, 2026-03-24 17:18:42 +0800
+Duration: 11.31 seconds
+Number of files: 1
+Original size: 67.11 MB
+Deduplicated size: 67.11 MB
+Time spent in hashing: 0.14 seconds
+Time spent in chunking: 0.33 seconds
+Added files: 1
+Unchanged files: 0
+Modified files: 0
+Error files: 0
+Files changed while reading: 0
+Bytes read from remote: 0
+Bytes sent to remote: 0
+
+real    0m14.793s
+user    0m12.076s
+sys     0m0.098s
+root@PC:/mnt/d/GitHub/borg#
+
+
+
+root@PC:/mnt/d/GitHub/borg# ls
+AUTHORS   CHANGES.rst  MANIFEST.in  Rust.md      Vagrantfile  local           requirements.d  rust               rust_benchmark_dump.log  setup.py  ui.md
+Brewfile  LICENSE      README.rst   SECURITY.md  docs         pyproject.toml  rorg.sh         rust_benchmark.md  scripts                  src
+root@PC:/mnt/d/GitHub/borg# borg delete ::test1 ; borg compact ; time borg2 create --progress --stats ::test1 local/in/ -C lzma,9
+-bash: /usr/local/bin/borg: No such file or directory
+-bash: /usr/local/bin/borg: No such file or directory
+Archive ::test1 already exists
+
+real    0m0.597s
+user    0m0.347s
+sys     0m0.073s
+root@PC:/mnt/d/GitHub/borg# borg delete ::test1 ; /usr/bin/borg2 compact ; time borg2 create --progress --stats ::test1 local/in/ -C lzma,9
+-bash: /usr/local/bin/borg: No such file or directory
+Archive ::test1 already exists
+
+real    0m0.522s
+user    0m0.368s
+sys     0m0.069s
+root@PC:/mnt/d/GitHub/borg# /usr/borg delete ::test1 ; /usr/bin/borg2 compact ; time /usr/bin/borg2 create --progress --stats ::test1 local/in/ -C lzma,9
+-bash: /usr/borg: No such file or directory
+Archive ::test1 already exists
+
+real    0m0.493s
+user    0m0.378s
+sys     0m0.046s
+root@PC:/mnt/d/GitHub/borg# /usr/bin/borg2 delete ::test1 ; /usr/bin/borg2 compact ; time /usr/bin/borg2 create --progress --stats ::test1 local/in/ -C lzma,9
+usage: borg2 [-V] [-h] [--critical] [--error] [--warning] [--info] [--debug] [--debug-topic TOPIC] [-p] [--iec] [--log-json] [--lock-wait SECONDS] [--bypass-lock] [--show-version] [--show-rc]
+             [--umask M] [--remote-path PATH] [--upload-ratelimit RATE] [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH] [--socket [PATH]] [-r REPO]
+             <command> ...
+borg2: error: unrecognized arguments: ::test1
+Archive ::test1 already exists
+
+real    0m0.455s
+user    0m0.347s
+sys     0m0.056s
+root@PC:/mnt/d/GitHub/borg# /usr/bin/borg2 rm ::test1 ; /usr/bin/borg2 compact ; time /usr/bin/borg2 create --progress --stats ::test1 local/in/ -C lzma,9
+usage: borg2 [-V] [-h] [--critical] [--error] [--warning] [--info] [--debug] [--debug-topic TOPIC] [-p] [--iec] [--log-json] [--lock-wait SECONDS] [--bypass-lock] [--show-version] [--show-rc]
+             [--umask M] [--remote-path PATH] [--upload-ratelimit RATE] [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH] [--socket [PATH]] [-r REPO]
+             <command> ...
+borg2: error: argument <command>: invalid choice: 'rm' (choose from 'benchmark', 'check', 'compact', 'config', 'create', 'debug', 'delete', 'diff', 'extract', 'help', 'info', 'key', 'list', 'break-lock', 'with-lock', 'mount', 'umount', 'prune', 'rcompress', 'rcreate', 'rdelete', 'rinfo', 'rlist', 'recreate', 'rename', 'serve', 'export-tar', 'import-tar', 'transfer', 'version')
+Archive ::test1 already exists
+
+real    0m0.454s
+user    0m0.369s
+sys     0m0.032s
+root@PC:/mnt/d/GitHub/borg# /usr/bin/borg2 delete ::test1 ; /usr/bin/borg2 compact ; time /usr/bin/borg2 create --progress --stats ::test1 local/in/ -C lzma,9
+usage: borg2 [-V] [-h] [--critical] [--error] [--warning] [--info] [--debug] [--debug-topic TOPIC] [-p] [--iec] [--log-json] [--lock-wait SECONDS] [--bypass-lock] [--show-version] [--show-rc]
+             [--umask M] [--remote-path PATH] [--upload-ratelimit RATE] [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH] [--socket [PATH]] [-r REPO]
+             <command> ...
+borg2: error: unrecognized arguments: ::test1
+Archive ::test1 already exists
+
+real    0m0.652s
+user    0m0.525s
+sys     0m0.058s
+root@PC:/mnt/d/GitHub/borg# /usr/bin/borg2 delete test1 ; /usr/bin/borg2 compact ; time /usr/bin/borg2 create --progress --stats ::test1 local/in/ -C lzma,9
+usage: borg2 [-V] [-h] [--critical] [--error] [--warning] [--info] [--debug] [--debug-topic TOPIC] [-p] [--iec] [--log-json] [--lock-wait SECONDS] [--bypass-lock] [--show-version] [--show-rc]
+             [--umask M] [--remote-path PATH] [--upload-ratelimit RATE] [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH] [--socket [PATH]] [-r REPO]
+             <command> ...
+borg2: error: unrecognized arguments: test1
+Archive ::test1 already exists
+
+real    0m0.488s
+user    0m0.367s
+sys     0m0.047s
+root@PC:/mnt/d/GitHub/borg# /usr/bin/borg2 delete ; /usr/bin/borg2 compact ; time /usr/bin/borg2 create --progress --stats ::test1 local/in/ -C lzma,9
+Local Exception
+
+Error:
+
+AttributeError: 'Archiver' object has no attribute 'print_error'
+
+If reporting bugs, please include the following:
+
+Traceback (most recent call last):
+  File "/usr/lib/borgbackup2/borg/archiver/__init__.py", line 656, in main
+    exit_code = archiver.run(args)
+                ^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/borgbackup2/borg/archiver/__init__.py", line 549, in run
+    rc = func(args)
+         ^^^^^^^^^^
+  File "/usr/lib/borgbackup2/borg/archiver/_common.py", line 158, in wrapper
+    return method(self, args, repository=repository, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/borgbackup2/borg/archiver/delete_cmd.py", line 27, in do_delete
+    self.print_error(
+    ^^^^^^^^^^^^^^^^
+AttributeError: 'Archiver' object has no attribute 'print_error'
+
+Platform: Linux PC 5.15.167.4-microsoft-standard-WSL2 #1 SMP Tue Nov 5 00:21:55 UTC 2024 x86_64
+Linux: Unknown Linux
+Borg: 2.0.0b8  Python: CPython 3.12.3 msgpack: 1.0.3 fuse: pyfuse3 3.3.0 [pyfuse3,llfuse]
+PID: 11343  CWD: /mnt/d/GitHub/borg
+sys.argv: ['/usr/bin/borg2', 'delete']
+SSH_ORIGINAL_COMMAND: None
+
+
+Archive ::test1 already exists
+
+real    0m0.478s
+user    0m0.396s
+sys     0m0.011s
+root@PC:/mnt/d/GitHub/borg# /usr/bin/borg2 delete
+Local Exception
+
+Error:
+
+AttributeError: 'Archiver' object has no attribute 'print_error'
+
+If reporting bugs, please include the following:
+
+Traceback (most recent call last):
+  File "/usr/lib/borgbackup2/borg/archiver/__init__.py", line 656, in main
+    exit_code = archiver.run(args)
+                ^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/borgbackup2/borg/archiver/__init__.py", line 549, in run
+    rc = func(args)
+         ^^^^^^^^^^
+  File "/usr/lib/borgbackup2/borg/archiver/_common.py", line 158, in wrapper
+    return method(self, args, repository=repository, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/borgbackup2/borg/archiver/delete_cmd.py", line 27, in do_delete
+    self.print_error(
+    ^^^^^^^^^^^^^^^^
+AttributeError: 'Archiver' object has no attribute 'print_error'
+
+Platform: Linux PC 5.15.167.4-microsoft-standard-WSL2 #1 SMP Tue Nov 5 00:21:55 UTC 2024 x86_64
+Linux: Unknown Linux
+Borg: 2.0.0b8  Python: CPython 3.12.3 msgpack: 1.0.3 fuse: pyfuse3 3.3.0 [pyfuse3,llfuse]
+PID: 11353  CWD: /mnt/d/GitHub/borg
+sys.argv: ['/usr/bin/borg2', 'delete']
+SSH_ORIGINAL_COMMAND: None
+
+
+root@PC:/mnt/d/GitHub/borg# borg2 rcreate -e none
+A repository already exists at /mnt/d/GitHub/borg/local/out3.
+root@PC:/mnt/d/GitHub/borg# !B
+BORG_REPO=/mnt/d/GitHub/borg/local/out3
+root@PC:/mnt/d/GitHub/borg# BORG_REPO=/mnt/d/GitHub/borg/local/out4
+root@PC:/mnt/d/GitHub/borg# borg2 rcreate -e none
+root@PC:/mnt/d/GitHub/borg# time /usr/bin/borg2 create --progress --stats ::test1 local/in/ -C lzma,9
+Initializing cache transaction: Reading config
+Initializing cache transaction: Reading chunks
+Initializing cache transaction: Reading files
+
+Saving files cache
+Saving chunks cache
+Saving cache config
+
+Repository: /mnt/d/GitHub/borg/local/out4
+Archive name: ::test1
+Archive fingerprint: 2271f55b5b47d0d9a48c28892d1586d74f81fc9cec202ba22f610435dcee5daa
+Time (start): Tue, 2026-03-24 17:52:58 +0800
+Time (end):   Tue, 2026-03-24 17:53:38 +0800
+Duration: 39.53 seconds
+Number of files: 1
+Original size: 67.11 MB
+Deduplicated size: 67.11 MB
+Time spent in hashing: 0.15 seconds
+Time spent in chunking: 0.37 seconds
+Added files: 1
+Unchanged files: 0
+Modified files: 0
+Error files: 0
+Files changed while reading: 0
+Bytes read from remote: 0
+Bytes sent to remote: 0
+
+real    0m46.003s
+user    0m42.590s
+sys     0m0.371s
+root@PC:/mnt/d/GitHub/borg#
+
+
+
+# time lzma -1 < local/in640/hexdump640M.txt | pv > /dev/null
+ 313MiB 0:02:28 [2.11MiB/s] [                                                                                                                                                                 <=>    ]
+
+real    2m39.907s
+user    2m19.922s
+sys     0m3.206s
+root@PC:/mnt/d/GitHub/borg#
+
+# export BORG_REPO=/mnt/d/GitHub/borg/local/out5 ; borg2 rcreate -e none ; time /usr/bin/borg2 create --progress --stats ::test1 local/in640/ -C lzma,1
+Initializing cache transaction: Reading config
+Initializing cache transaction: Reading chunks
+Initializing cache transaction: Reading files
+
+Saving files cache
+Saving chunks cache
+Saving cache config
+
+Repository: /mnt/d/GitHub/borg/local/out5
+Archive name: ::test1
+Archive fingerprint: ac222dd6bc281f8cb2241a625a37ab9a3dbbbfbbe3f80c6489528f77b99fb6ee
+Time (start): Tue, 2026-03-24 18:47:02 +0800
+Time (end):   Tue, 2026-03-24 18:48:29 +0800
+Duration: 1 minutes 26.92 seconds
+Number of files: 1
+Original size: 671.09 MB
+Deduplicated size: 671.09 MB
+Time spent in hashing: 1.16 seconds
+Time spent in chunking: 2.85 seconds
+Added files: 1
+Unchanged files: 0
+Modified files: 0
+Error files: 0
+Files changed while reading: 0
+Bytes read from remote: 0
+Bytes sent to remote: 0
+
+real    1m33.260s
+user    1m30.346s
+sys     0m0.262s
+root@PC:/mnt/d/GitHub/borg#
+root@PC:/mnt/d/GitHub/borg# mv /usr/local.bak/ /usr/local
+root@PC:/mnt/d/GitHub/borg# export BORG_REPO=/mnt/d/GitHub/borg/local/out6 ; ./rorg.sh repo-create -e none ; time ./rorg.sh create --progress --stats --rust-stats ::test1 local/in640/ -C lzma,1
+
+Reserve some repository storage space now for emergencies like 'disk full'
+by running:
+    borg repo-space --reserve 1G
+Repository: /mnt/d/GitHub/borg/local/out6
+Archive name: ::test1
+Archive fingerprint: ec3b9b7dd93a30d95833d05bf0657527de939435b3968032b231003d6409fe52
+Time (nominal): Tue, 2026-03-24 18:50:11 +0800
+Time (start):   Tue, 2026-03-24 18:50:11 +0800
+Time (end):     Tue, 2026-03-24 18:50:39 +0800
+Duration: 27.843 seconds
+Number of files: 1
+Original size: 671.09 MB
+Deduplicated size: 671.09 MB
+Time spent in hashing: 1.791 seconds
+Time spent in chunking: 5.744 seconds
+Added files: 1
+Unchanged files: 0
+Modified files: 0
+Error files: 0
+Files changed while reading: 0
+Bytes read from remote: 0
+Bytes sent to remote: 0
+Rust runtime:
+pipeline=1
+compress=1
+encrypt=0
+combined=0
+chunker=0
+Rust Concurrency Stats:
+Active time (ms): 22428.691
+Average tasks in flight: 137.500
+Maximum tasks in flight: 275
+Saving files cache
+Saving chunks cache
+Saving cache config
+
+
+real    0m29.171s
+user    3m9.286s
+sys     0m1.123s
+root@PC:/mnt/d/GitHub/borg
+
+root@PC:/mnt/d/GitHub/borg
+root@PC:/mnt/d/GitHub/borg
+
+
+user    1m30.470s
+sys     0m1.440s
+root@PC:/tmp/borg# export BORG_REPO=/tmp/borg/out9 ; /mnt/d/GitHub/borg/rorg.sh repo-create -e none ; time /mnt/d/GitHub/borg/rorg.sh create --progress --stats --rust-stats ::test1 in/ -C lzma,9
+
+Reserve some repository storage space now for emergencies like 'disk full'
+by running:
+    borg repo-space --reserve 1G
+Repository: /tmp/borg/out9
+Archive name: ::test1
+Archive fingerprint: f47260cf8c015a29877183eb2d0a8f287f798b1bcca86017c3f59492901a1394
+Time (nominal): Tue, 2026-03-24 19:10:35 +0800
+Time (start):   Tue, 2026-03-24 19:10:35 +0800
+Time (end):     Tue, 2026-03-24 19:11:44 +0800
+Duration: 1 minutes 8.897 seconds
+Number of files: 1
+Original size: 671.09 MB
+Deduplicated size: 671.09 MB
+Time spent in hashing: 3.517 seconds
+Time spent in chunking: 3.210 seconds
+Added files: 1
+Unchanged files: 0
+Modified files: 0
+Error files: 0
+Files changed while reading: 0
+Bytes read from remote: 0
+Bytes sent to remote: 0
+Rust runtime:
+pipeline=1
+compress=1
+encrypt=0
+combined=0
+chunker=0
+Rust Concurrency Stats:
+Active time (ms): 61148.549
+Average tasks in flight: 136.000
+Maximum tasks in flight: 272
+Saving files cache
+Saving chunks cache
+Saving cache config
+
+
+real    1m10.139s
+user    11m53.896s
+sys     0m8.117s
+root@PC:/tmp/borg#
+
+root@PC:/tmp/borg# export BORG_REPO=/tmp/borg/outA ; /usr/bin/borg2 rcreate -e none ; time /usr/bin/borg2 create --progress --stats ::test1 in/ -C lzma,9
+A repository already exists at /tmp/borg/outA.
+Initializing cache transaction: Reading config
+Initializing cache transaction: Reading chunks
+Initializing cache transaction: Reading files
+
+Saving files cache
+Saving chunks cache
+Saving cache config
+
+Repository: /tmp/borg/outA
+Archive name: ::test1
+Archive fingerprint: d9cd6c80060d727986da8e27c4822cf0bbabf7f5559196d92911972fa554880f
+Time (start): Tue, 2026-03-24 19:15:19 +0800
+Time (end):   Tue, 2026-03-24 19:21:46 +0800
+Duration: 6 minutes 27.41 seconds
+Number of files: 1
+Original size: 671.09 MB
+Deduplicated size: 671.09 MB
+Time spent in hashing: 1.56 seconds
+Time spent in chunking: 1.40 seconds
+Added files: 1
+Unchanged files: 0
+Modified files: 0
+Error files: 0
+Files changed while reading: 0
+Bytes read from remote: 0
+Bytes sent to remote: 0
+
+real    7m3.159s
+user    6m58.665s
+sys     0m3.335s
+root@PC:/tmp/borg#
+
+
+# export BORG_REPO=/tmp/borg/outB ; /usr/bin/borg2 rcreate -e none ; time /usr/bin/borg2 create --progress --stats ::test1 in/ -C lz4
+Initializing cache transaction: Reading config
+Initializing cache transaction: Reading chunks
+Initializing cache transaction: Reading files
+
+Saving files cache
+Saving chunks cache
+Saving cache config
+
+Repository: /tmp/borg/outB
+Archive name: ::test1
+Archive fingerprint: 3243c81bd4baa2e259bf83cec5c7ac7379d1870568dd2725925b164632cb0951
+Time (start): Tue, 2026-03-24 19:25:19 +0800
+Time (end):   Tue, 2026-03-24 19:25:25 +0800
+Duration: 6.01 seconds
+Number of files: 1
+Original size: 671.09 MB
+Deduplicated size: 671.09 MB
+Time spent in hashing: 1.62 seconds
+Time spent in chunking: 1.22 seconds
+Added files: 1
+Unchanged files: 0
+Modified files: 0
+Error files: 0
+Files changed while reading: 0
+Bytes read from remote: 0
+Bytes sent to remote: 0
+
+real    0m6.604s
+user    0m4.757s
+sys     0m0.990s
+
+root@PC:/tmp/borg# mv /usr/local.bak/ /usr/local
+root@PC:/tmp/borg# export BORG_REPO=/tmp/borg/outC ; /mnt/d/GitHub/borg/rorg.sh repo-create -e none ; time /mnt/d/GitHub/borg/rorg.sh create --progress --stats --rust-stats ::test1 in/ -C lz4
+
+Reserve some repository storage space now for emergencies like 'disk full'
+by running:
+    borg repo-space --reserve 1G
+Repository: /tmp/borg/outC
+Archive name: ::test1
+Archive fingerprint: aa9f2415ad7b482954616b5230dc2a10832a6af138330d51b60aec7833ee8c49
+Time (nominal): Tue, 2026-03-24 19:26:27 +0800
+Time (start):   Tue, 2026-03-24 19:26:27 +0800
+Time (end):     Tue, 2026-03-24 19:26:41 +0800
+Duration: 14.081 seconds
+Number of files: 1
+Original size: 671.09 MB
+Deduplicated size: 671.09 MB
+Time spent in hashing: 2.237 seconds
+Time spent in chunking: 2.203 seconds
+Added files: 1
+Unchanged files: 0
+Modified files: 0
+Error files: 0
+Files changed while reading: 0
+Bytes read from remote: 0
+Bytes sent to remote: 0
+Rust runtime:
+pipeline=1
+compress=1
+encrypt=0
+combined=0
+chunker=0
+Rust Concurrency Stats:
+Active time (ms): 12672.691
+Average tasks in flight: 136.000
+Maximum tasks in flight: 272
+Saving files cache
+Saving chunks cache
+Saving cache config
+
+
+real    0m15.726s
+user    0m16.169s
+sys     0m1.507s
+root@PC:/tmp/borg# export BORG_REPO=/tmp/borg/outC ; /mnt/d/GitHub/borg/rorg.sh repo-create -e none ; time /mnt/d/GitHub/borg/rorg.sh -j1 create --progress --stats --rust-stats ::test1 in/ -C lz4
+A repository already exists at file:///tmp/borg/outC.
+usage: __main__.py [--config CONFIG] [--print_config[=flags]] [-V] [--cockpit] [-h] [--critical] [--error] [--warning] [--info] [--debug] [--debug-topic TOPIC] [-p] [--iec] [--log-json]
+                   [--lock-wait SECONDS] [--show-version] [--show-rc] [--umask M] [--remote-path PATH] [--upload-ratelimit RATE] [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH]
+                   [--socket [PATH]] [-r REPO]
+                   <command> ...
+tip: For details of accepted options run: __main__.py --help
+error: Unrecognized arguments: -j1
+
+real    0m1.460s
+user    0m0.549s
+sys     0m0.104s
+root@PC:/tmp/borg# export BORG_REPO=/tmp/borg/outD ; /mnt/d/GitHub/borg/rorg.sh repo-create -e none ; time /mnt/d/GitHub/borg/rorg.sh -j1 create --progress --stats --rust-stats ::test1 in/ -C lz4
+
+Reserve some repository storage space now for emergencies like 'disk full'
+by running:
+    borg repo-space --reserve 1G
+usage: __main__.py [--config CONFIG] [--print_config[=flags]] [-V] [--cockpit] [-h] [--critical] [--error] [--warning] [--info] [--debug] [--debug-topic TOPIC] [-p] [--iec] [--log-json]
+                   [--lock-wait SECONDS] [--show-version] [--show-rc] [--umask M] [--remote-path PATH] [--upload-ratelimit RATE] [--upload-buffer UPLOAD_BUFFER] [--debug-profile FILE] [--rsh RSH]
+                   [--socket [PATH]] [-r REPO]
+                   <command> ...
+tip: For details of accepted options run: __main__.py --help
+error: Unrecognized arguments: -j1
+
+real    0m1.386s
+user    0m0.546s
+sys     0m0.068s
+root@PC:/tmp/borg# export BORG_REPO=/tmp/borg/outD ; /mnt/d/GitHub/borg/rorg.sh mount mnt/
+Warning: The mounted archive is capable of containing symlinks that point outside the archive tree. When following such symlinks you may see files and directories within the mountpoint that do not reflect the archive content.
+root@PC:/tmp/borg# ls mnt/
+root@PC:/tmp/borg# export BORG_REPO=/tmp/borg/outD ; /mnt/d/GitHub/borg/rorg.sh mount mnt
+Runtime error: mnt: Mountpoint must be a **writable** directory
+root@PC:/tmp/borg# ls mnt
+root@PC:/tmp/borg# fuse
+fuse-overlayfs  fuser           fusermount      fusermount3
+root@PC:/tmp/borg# fuse
+fuse-overlayfs  fuser           fusermount      fusermount3
+root@PC:/tmp/borg# fuse
+fuse-overlayfs  fuser           fusermount      fusermount3
+root@PC:/tmp/borg# fuse
+fuse-overlayfs  fuser           fusermount      fusermount3
+root@PC:/tmp/borg# fusermount -u mnt
+root@PC:/tmp/borg# export BORG_REPO=/tmp/borg/outD ; /mnt/d/GitHub/borg/rorg.sh mount mnt
+Warning: The mounted archive is capable of containing symlinks that point outside the archive tree. When following such symlinks you may see files and directories within the mountpoint that do not reflect the archive content.
+root@PC:/tmp/borg# ls mnt
+root@PC:/tmp/borg# export BORG_REPO=/tmp/borg/outC ; /mnt/d/GitHub/borg/rorg.sh mount mnt
+Runtime error: mnt: Mountpoint must be a **writable** directory
+root@PC:/tmp/borg# fusermount -u mnt
+root@PC:/tmp/borg# export BORG_REPO=/tmp/borg/outC ; /mnt/d/GitHub/borg/rorg.sh mount mnt
+Warning: The mounted archive is capable of containing symlinks that point outside the archive tree. When following such symlinks you may see files and directories within the mountpoint that do not reflect the archive content.
+root@PC:/tmp/borg# ll mnt/\:\:test1/in/hexdump640M.txt
+-rw-r--r-- 1 root root 671088640 Mar 24 19:07 mnt/::test1/in/hexdump640M.txt
+root@PC:/tmp/borg# sha256sum mnt/\:\:test1/in/hexdump640M.txt
+ff7411c4b0bf42bb47f2c97fe519df8f95af02da1013517d963883e8be2dfb82  mnt/::test1/in/hexdump640M.txt
+root@PC:/tmp/borg# sha256sum in/hexdump640M.txt
+ff7411c4b0bf42bb47f2c97fe519df8f95af02da1013517d963883e8be2dfb82  in/hexdump640M.txt
+root@PC:/tmp/borg# fusermount -u mnt
+root@PC:/tmp/borg#
+root@PC:/tmp/borg# export BORG_REPO=/tmp/borg/out9 ; /mnt/d/GitHub/borg/rorg.sh mount mnt ; ll `find mnt` ; sha256sum `find mnt`
+Warning: The mounted archive is capable of containing symlinks that point outside the archive tree. When following such symlinks you may see files and directories within the mountpoint that do not reflect the archive content.
+-rw-r--r-- 1 root root 671088640 Mar 24 19:07 mnt/::test1/in/hexdump640M.txt
+
+mnt:
+total 4
+drwxr-xr-x  1 root root    0 Mar 24 19:33 ./
+drwxr-xr-x 11 root root 4096 Mar 24 19:27 ../
+drwxr-xr-x  1 root root    0 Mar 24 19:10 ::test1/
+
+'mnt/::test1':
+total 0
+drwxr-xr-x 1 root root 0 Mar 24 19:10 ./
+drwxr-xr-x 1 root root 0 Mar 24 19:33 ../
+drwxr-xr-x 1 root root 0 Mar 24 19:07 in/
+
+'mnt/::test1/in':
+total 655360
+drwxr-xr-x 1 root root         0 Mar 24 19:07 ./
+drwxr-xr-x 1 root root         0 Mar 24 19:10 ../
+-rw-r--r-- 1 root root 671088640 Mar 24 19:07 hexdump640M.txt
+sha256sum: mnt: Is a directory
+sha256sum: 'mnt/::test1': Is a directory
+sha256sum: 'mnt/::test1/in': Is a directory
+ff7411c4b0bf42bb47f2c97fe519df8f95af02da1013517d963883e8be2dfb82  mnt/::test1/in/hexdump640M.txt
+root@PC:/tmp/borg#
