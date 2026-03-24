@@ -115,12 +115,7 @@ def benchmark(
 
 
 def append_markdown(
-    path: Path,
-    step_name: str,
-    results: dict[str, list[tuple[float, float]]],
-    *,
-    payload_mode: str,
-    num_files: int,
+    path: Path, step_name: str, results: dict[str, list[tuple[float, float]]], *, payload_mode: str, num_files: int
 ) -> None:
     with path.open("a", encoding="utf-8") as fd:
         fd.write(f"\n## {step_name}\n\n")
@@ -143,11 +138,7 @@ def append_markdown(
 
 
 def benchmark_pool_setup(
-    python_cmd: list[str],
-    borg_pythonpath: str,
-    *,
-    iterations: int,
-    jobs_list: list[int],
+    python_cmd: list[str], borg_pythonpath: str, *, iterations: int, jobs_list: list[int]
 ) -> dict[int, list[tuple[float, float]]]:
     cmd_base = [*python_cmd, "-c"]
     results: dict[int, list[tuple[float, float]]] = {}
@@ -207,11 +198,7 @@ def main() -> None:
     parser.add_argument("--pool-setup-bench", action="store_true", help="Run Rayon pool setup microbenchmark")
     parser.add_argument("--pool-iterations", type=int, default=25, help="Iterations per jobs value for pool bench")
     parser.add_argument(
-        "--pool-jobs",
-        nargs="*",
-        type=int,
-        default=[1, 2, 4],
-        help="Jobs values used for pool setup microbenchmark",
+        "--pool-jobs", nargs="*", type=int, default=[1, 2, 4], help="Jobs values used for pool setup microbenchmark"
     )
     parser.add_argument(
         "--python-cmd",
@@ -220,9 +207,7 @@ def main() -> None:
         help="Python command for pool setup benchmark, e.g. --python-cmd python3",
     )
     parser.add_argument(
-        "--borg-pythonpath",
-        default="src",
-        help="PYTHONPATH used to import borg for pool setup microbenchmark",
+        "--borg-pythonpath", default="src", help="PYTHONPATH used to import borg for pool setup microbenchmark"
     )
     parser.add_argument(
         "--payload-mode",
@@ -241,10 +226,7 @@ def main() -> None:
     out_path = Path(args.out)
     if args.pool_setup_bench:
         pool_results = benchmark_pool_setup(
-            args.python_cmd,
-            args.borg_pythonpath,
-            iterations=args.pool_iterations,
-            jobs_list=args.pool_jobs,
+            args.python_cmd, args.borg_pythonpath, iterations=args.pool_iterations, jobs_list=args.pool_jobs
         )
         append_pool_markdown(out_path, args.step, pool_results)
     else:
@@ -259,13 +241,7 @@ def main() -> None:
             payload_mode=args.payload_mode,
             num_files=args.num_files,
         )
-        append_markdown(
-            out_path,
-            args.step,
-            results,
-            payload_mode=args.payload_mode,
-            num_files=args.num_files,
-        )
+        append_markdown(out_path, args.step, results, payload_mode=args.payload_mode, num_files=args.num_files)
 
 
 if __name__ == "__main__":

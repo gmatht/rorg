@@ -74,11 +74,7 @@ class RustChunker:
         if ext is None:
             raise RuntimeError("borg_rust_ext is not available")
         return ext.RustBuzhashChunker(
-            self.seed,
-            self.chunk_min_exp,
-            self.chunk_max_exp,
-            self.hash_mask_bits,
-            self.hash_window_size,
+            self.seed, self.chunk_min_exp, self.chunk_max_exp, self.hash_mask_bits, self.hash_window_size
         )
 
     def chunkify(self, fd, fh=-1, fmap=None):
@@ -99,13 +95,7 @@ class RustChunker:
 
         self._fd = fd
         self.fh = fh
-        self._file_reader = FileReader(
-            fd=fd,
-            fh=fh,
-            read_size=self.reader_block_size,
-            sparse=self.sparse,
-            fmap=None,
-        )
+        self._file_reader = FileReader(fd=fd, fh=fh, read_size=self.reader_block_size, sparse=self.sparse, fmap=None)
         self._rust = self._new_rust()
         self._file_eof = False
         return self

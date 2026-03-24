@@ -18,10 +18,7 @@ def get_chunker(algo, *params, **kw):
         from .. import rust_bridge
         from . import rust_buzhash
 
-        if (
-            rust_bridge.rust_chunker_enabled()
-            and rust_buzhash.rust_chunker_available()
-        ):
+        if rust_bridge.rust_chunker_enabled() and rust_buzhash.rust_chunker_available():
             return rust_buzhash.RustChunker(seed, *params, sparse=sparse)
         return Chunker(seed, *params, sparse=sparse)
     if algo == "buzhash64":

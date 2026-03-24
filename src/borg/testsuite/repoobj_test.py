@@ -226,14 +226,7 @@ def test_rust_bridge_combined_not_implemented_falls_back(monkeypatch):
             raise NotImplementedError
 
     monkeypatch.setattr(rust_bridge, "_EXT", _FakeExt())
-    got = rust_bridge.compress_encrypt(
-        b"id",
-        {},
-        b"payload",
-        jobs=1,
-        ctype=0x01,
-        clevel=255,
-    )
+    got = rust_bridge.compress_encrypt(b"id", {}, b"payload", jobs=1, ctype=0x01, clevel=255)
     assert got is None
 
 

@@ -82,14 +82,7 @@ def get_rust_ext_status(required_symbols: tuple[str, ...] = ()) -> tuple[str, st
     return "loaded", "extension loaded"
 
 
-def compress(
-    meta: dict,
-    data: BufferLike,
-    *,
-    jobs: Optional[int] = None,
-    ctype: int,
-    clevel: int,
-):
+def compress(meta: dict, data: BufferLike, *, jobs: Optional[int] = None, ctype: int, clevel: int):
     ext = _load_ext()
     if ext is None or not hasattr(ext, "compress"):
         return None
@@ -107,13 +100,7 @@ def encrypt(id_bytes: bytes, data: BufferLike, *, jobs: Optional[int] = None):
 
 
 def compress_encrypt(
-    id_bytes: bytes,
-    meta: dict,
-    data: BufferLike,
-    *,
-    jobs: Optional[int] = None,
-    ctype: int,
-    clevel: int,
+    id_bytes: bytes, meta: dict, data: BufferLike, *, jobs: Optional[int] = None, ctype: int, clevel: int
 ):
     ext = _load_ext()
     if ext is None or not hasattr(ext, "compress_encrypt"):
@@ -193,12 +180,7 @@ def rust_buzhash_update(sum_: int, remove: int, add: int, length: int, seed: int
 
 
 def buzhash_chunk_bytes(
-    data: bytes,
-    seed: int,
-    chunk_min_exp: int,
-    chunk_max_exp: int,
-    hash_mask_bits: int,
-    hash_window_size: int,
+    data: bytes, seed: int, chunk_min_exp: int, chunk_max_exp: int, hash_mask_bits: int, hash_window_size: int
 ) -> list[bytes] | None:
     """
     Content-defined chunks matching Cython ``Chunker`` on dense input (same as ``BytesIO``).
@@ -210,11 +192,4 @@ def buzhash_chunk_bytes(
     ext = _load_ext()
     if ext is None or not hasattr(ext, "buzhash_chunk_bytes"):
         return None
-    return ext.buzhash_chunk_bytes(
-        data,
-        seed,
-        chunk_min_exp,
-        chunk_max_exp,
-        hash_mask_bits,
-        hash_window_size,
-    )
+    return ext.buzhash_chunk_bytes(data, seed, chunk_min_exp, chunk_max_exp, hash_mask_bits, hash_window_size)
