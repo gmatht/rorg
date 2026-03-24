@@ -203,6 +203,15 @@ def test_argument_parser_error_accepts_jsonargparse_extra_arg():
         parser.error("bad message", ValueError("wrapped"))
 
 
+def test_unrecognized_args_before_subcommand_shows_reordered_example(cmd_fixture):
+    exit_code, output = cmd_fixture("--stats", "create", "foo")
+    assert exit_code == 2
+    assert "Unrecognized arguments" in output
+    assert "Common fixes:" in output
+    assert "Put subcommand-specific options after `<command>`:" in output
+    assert "create" in output and "--stats" in output
+
+
 def test_preprocess_prints_glob_archives_migration_hint(tmp_path):
     repo = os.fspath(tmp_path / "repo")
     exit_code, output = exec_cmd("--repo", repo, "list", "dummy-archive", "--glob-archives", "sh:old", fork=False)

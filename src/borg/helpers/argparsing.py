@@ -128,6 +128,103 @@ _TOP_COMMAND_EXAMPLES = {
     "list": "borg -r REPO list ARCHIVE",
 }
 
+# Top-level subcommand names (must match build_parser / <command> choices).
+_TOP_LEVEL_COMMANDS = frozenset(
+    {
+        "analyze",
+        "benchmark",
+        "check",
+        "compact",
+        "completion",
+        "create",
+        "debug",
+        "delete",
+        "diff",
+        "extract",
+        "help",
+        "info",
+        "key",
+        "list",
+        "break-lock",
+        "with-lock",
+        "mount",
+        "umount",
+        "prune",
+        "repo-compress",
+        "repo-create",
+        "repo-delete",
+        "repo-info",
+        "repo-list",
+        "recreate",
+        "rename",
+        "repo-space",
+        "serve",
+        "tag",
+        "export-tar",
+        "import-tar",
+        "transfer",
+        "undelete",
+        "version",
+    }
+)
+
+
+def _parse_unrecognized_arguments_raw(message: str) -> str | None:
+    if "unrecognized arguments" not in message.lower():
+        return None
+    m = re.search(r"Unrecognized arguments:\s*(.+?)(?:\n|$)", message, re.IGNORECASE | re.DOTALL)
+    if not m:
+        return None
+    return m.group(1).strip()
+
+
+def _find_contiguous_subsequence(haystack: list[str], needle: list[str]) -> int | None:
+    if not needle or len(needle) > len(haystack):
+        return None
+    for i in range(len(haystack) - len(needle) + 1):
+        if haystack[i : i + len(needle)] == needle:
+            return i
+    return None
+
+
+def _remove_contiguous_subsequence(haystack: list[str], needle: list[str]) -> list[str] | None:
+    i = _find_contiguous_subsequence(haystack, needle)
+    if i is None:
+        return None
+    return haystack[:i] + haystack[i + len(needle) :]
+
+
+def _suggest_move_options_after_subcommand(message: str) -> str | None:
+    """
+    If the user put subcommand-specific flags before <command> (e.g. borg --stats create ...),
+    suggest the same argv with those flags after the subcommand.
+    """
+    raw = _parse_unrecognized_arguments_raw(message)
+    if not raw:
+        return None
+    try:
+        tokens = shlex.split(raw)
+    except ValueError:
+        return None
+    if not tokens:
+        return None
+    argv = sys.argv
+    sub_idx = None
+    for i, a in enumerate(argv):
+        if a in _TOP_LEVEL_COMMANDS:
+            sub_idx = i
+            break
+    if sub_idx is None or sub_idx < 2:
+        return None
+    prefix = argv[1:sub_idx]
+    if _find_contiguous_subsequence(prefix, tokens) is None:
+        return None
+    keep = _remove_contiguous_subsequence(prefix, tokens)
+    if keep is None:
+        return None
+    corrected = [argv[0]] + keep + [argv[sub_idx]] + tokens + argv[sub_idx + 1 :]
+    return " ".join(shlex.quote(c) for c in corrected)
+
 
 def _argv_tail_after_invalid_choice(invalid: str) -> list[str]:
     """Tokens after the invalid top-level subcommand in sys.argv, if any."""
@@ -179,6 +276,9 @@ class ArgumentParser(_ArgumentParser):
 
     def _common_fix_hints(self, message: str) -> list[str]:
         hints = []
+        reorder = _suggest_move_options_after_subcommand(message)
+        if reorder:
+            hints.append(f"Put subcommand-specific options after `<command>`: {reorder}")
         if "missing repository" in message.lower():
             hints.append("Set the repository via --repo REPO or BORG_REPO.")
         if "list.name is none" in message.lower() or ("list.name" in message and "is None" in message):
