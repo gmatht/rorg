@@ -1,7 +1,15 @@
-This is borg2!
---------------
+This is Rust Borg (Rorg)
+--------------    
 
-Please note that this is the README for borg2 / master branch.
+The goal of this fork is to rewrite performance-critical parts in Rust. I am currently looking at the chunking, compression, and encryption pipeline. This looks like it would be better in Rust/Rayon than sequential Python. Cython isn’t too bad for computation-heavy things like chunking, but in principle, Rust should eke out a little more performance.    Also, for archiving, it is important to use LZMA for its compression ratio, but compressing LZMA on one core is painful. Since Borg already breaks files into independent chunks, Rayon would seem to be a natural improvement over the current sequential Borg architecture.
+
+Be aware that the current Rorg snapshot is largely just an experiment at this point. It can archive to LZMA 6x faster on my CPU, but it has only been tested on two very simple files. It isn’t even necessarily faster; the original Borg seems to be over twice as fast for LZ4 for some reason. This somewhat challenges my assumption that Rust would have lower overhead than Cython, though I have not diagnosed the cause.
+
+Re-architecting the read() -> repository.get(id) -> repo_objs.parse(...) (decrypt + decompress + verify) path; e.g., for the fuse mount, may also improve performance, but I have no plans to look at that for now.
+
+--------------    
+
+The original README for the borg2 / master branch follows.
 
 For the stable version's docs, please see here:
 
