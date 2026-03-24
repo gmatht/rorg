@@ -39,6 +39,24 @@ Meaning:
 If the extension is missing or a function is unavailable, Borg falls back to
 the existing Python/Cython paths.
 
+Recommended profiles:
+
+- Fast/default testing profile:
+  - `BORG_RUST_PIPELINE=1`
+  - `BORG_RUST_COMPRESS=1`
+  - `BORG_RUST_ENCRYPT=0`
+  - `BORG_RUST_PIPELINE_COMBINED=0`
+  - `BORG_RUST_CHUNKER=0`
+- All-flags stress profile (for compatibility testing, not speed):
+  - `BORG_RUST_PIPELINE=1`
+  - `BORG_RUST_COMPRESS=1`
+  - `BORG_RUST_ENCRYPT=1`
+  - `BORG_RUST_PIPELINE_COMBINED=1`
+  - `BORG_RUST_CHUNKER=1`
+
+Note: at the moment, `encrypt` and `compress_encrypt` intentionally fall back
+to Python paths, so enabling them may add overhead without improving throughput.
+
 ## 3) Control jobs for `borg create`
 
 Use `-j N` / `--jobs N` with `borg create`:
@@ -52,6 +70,20 @@ concurrency metrics at the end of the run:
 - active time in milliseconds while there were async chunk puts in flight
 - average tasks in flight
 - maximum tasks in flight
+
+If stats are unavailable, Borg now prints a concrete reason, such as extension
+import errors or missing Rust symbols.
+
+## Troubleshooting: slow vs stuck
+
+Use this quick matrix while diagnosing:
+
+| Symptom | Likely cause | Quick check | Suggested action |
+| --- | --- | --- | --- |
+| High CPU, little output | Heavy compression work (often `lzma`) | `ps -o stat,pcpu,time,cmd -C python3` (or matching process) | Test with `-C zstd,1` and/or `-j1` first |
+| Near-zero CPU, command not progressing | Lock wait or blocking I/O | `borg ... --lock-wait 1` | Ensure only one Borg process is active for the repo |
+| `Rust concurrency stats unavailable: import ...` | Extension not importable | `python -c "import borg.borg_rust_ext"` | Rebuild extension, verify Python path/layout |
+| `Rust concurrency stats unavailable: extension missing required symbol(s)` | ABI/version mismatch between Python and extension | `python -c "import borg.borg_rust_ext as m; print(hasattr(m, 'pipeline_concurrency_stats_get'))"` | Rebuild extension from current source tree |
 
 ## 4) Optional timing/stat helpers
 

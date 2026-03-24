@@ -223,19 +223,34 @@ class CreateMixIn:
                         else:
                             log_multi(str(archive), str(archive.stats), logger=logging.getLogger("borg.output.stats"))
                     if args.rust_stats:
+                        stats_logger = logging.getLogger("borg.output.stats")
+                        rust_state, rust_details = rust_bridge.get_rust_ext_status(
+                            required_symbols=("pipeline_concurrency_stats_get",)
+                        )
+                        log_multi(
+                            "Rust runtime:",
+                            f"pipeline={int(rust_bridge.rust_enabled())}",
+                            f"compress={int(rust_bridge.rust_compress_enabled())}",
+                            f"encrypt={int(rust_bridge.rust_encrypt_enabled())}",
+                            f"combined={int(rust_bridge.rust_combined_enabled())}",
+                            f"chunker={int(rust_bridge.rust_chunker_enabled())}",
+                            logger=stats_logger,
+                        )
                         rust_stats = rust_bridge.pipeline_concurrency_stats_get()
                         if rust_stats is None:
-                            logger = logging.getLogger("borg.output.stats")
-                            log_multi("Rust concurrency stats unavailable (extension not loaded).", logger=logger)
+                            if rust_state == "loaded":
+                                reason = "stats API returned no data for this run"
+                            else:
+                                reason = rust_details
+                            log_multi(f"Rust concurrency stats unavailable: {reason}", logger=stats_logger)
                         else:
                             active_ms, avg_in_flight, max_in_flight = rust_stats
-                            logger = logging.getLogger("borg.output.stats")
                             log_multi(
                                 "Rust Concurrency Stats:",
                                 f"Active time (ms): {active_ms:.3f}",
                                 f"Average tasks in flight: {avg_in_flight:.3f}",
                                 f"Maximum tasks in flight: {max_in_flight}",
-                                logger=logger,
+                                logger=stats_logger,
                             )
 
         self.output_filter = args.output_filter

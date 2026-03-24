@@ -1,4 +1,5 @@
 import base64
+import concurrent.futures
 import errno
 import json
 import os
@@ -53,6 +54,8 @@ from .platform import acl_get, acl_set, set_flags, get_flags, swidth
 from .remote import RemoteRepository, cache_if_remote
 from .repository import Repository, NoManifestError
 from .repoobj import RepoObj
+from .compress import rust_compress_params
+from . import rust_bridge
 
 has_link = hasattr(os, "link")
 
@@ -1209,19 +1212,90 @@ class ChunksProcessor:
         self.add_item = add_item
         self.rechunkify = rechunkify
 
+    def _should_use_parallel_rust_compress(self):
+        rp = rust_compress_params(self.cache.repo_objs.compressor)
+        jobs = (self.cache.repo_objs.jobs or 1) if hasattr(self.cache.repo_objs, "jobs") else 1
+        enabled = rust_bridge.rust_enabled() and rust_bridge.rust_compress_enabled()
+        return enabled and rp is not None and jobs > 1, rp, jobs
+
     def process_file_chunks(self, item, cache, stats, show_progress, chunk_iter, chunk_processor=None):
-        if not chunk_processor:
-
-            def chunk_processor(chunk):
-                started_hashing = time.monotonic()
-                chunk_id, data = cached_hash(chunk, self.key.id_hash)
-                stats.hashing_time += time.monotonic() - started_hashing
-                chunk_entry = cache.add_chunk(chunk_id, {}, data, stats=stats, wait=False, ro_type=ROBJ_FILE_STREAM)
-                if self.cache.repository.async_response(wait=False) is not None:
-                    self.cache.rust_stats_note_async_completion()
-                return chunk_entry
-
         item.chunks = []
+        if not chunk_processor:
+            use_parallel, rust_params, jobs = self._should_use_parallel_rust_compress()
+
+            if use_parallel:
+                ctype, clevel = rust_params
+                pending = []
+
+                def compress_worker(data):
+                    compressed = rust_bridge.compress({}, data, jobs=1, ctype=ctype, clevel=clevel)
+                    if compressed is None:
+                        # Fallback safety if Rust path disappears mid-run.
+                        return self.cache.repo_objs.compressor.compress({}, data)
+                    return compressed
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as executor:
+                    for chunk in chunk_iter:
+                        started_hashing = time.monotonic()
+                        chunk_id, data = cached_hash(chunk, self.key.id_hash)
+                        stats.hashing_time += time.monotonic() - started_hashing
+                        size = len(data)
+                        fut = executor.submit(compress_worker, data)
+                        pending.append((chunk_id, size, fut))
+
+                        if len(pending) >= jobs * 2:
+                            p_chunk_id, p_size, p_fut = pending.pop(0)
+                            meta, data_compressed = p_fut.result()
+                            chunk_entry = cache.add_chunk(
+                                p_chunk_id,
+                                meta,
+                                data_compressed,
+                                stats=stats,
+                                wait=False,
+                                compress=False,
+                                size=p_size,
+                                ctype=meta["ctype"],
+                                clevel=meta["clevel"],
+                                ro_type=ROBJ_FILE_STREAM,
+                            )
+                            if self.cache.repository.async_response(wait=False) is not None:
+                                self.cache.rust_stats_note_async_completion()
+                            item.chunks.append(chunk_entry)
+                            if show_progress:
+                                stats.show_progress(item=item, dt=0.2)
+
+                    for p_chunk_id, p_size, p_fut in pending:
+                        meta, data_compressed = p_fut.result()
+                        chunk_entry = cache.add_chunk(
+                            p_chunk_id,
+                            meta,
+                            data_compressed,
+                            stats=stats,
+                            wait=False,
+                            compress=False,
+                            size=p_size,
+                            ctype=meta["ctype"],
+                            clevel=meta["clevel"],
+                            ro_type=ROBJ_FILE_STREAM,
+                        )
+                        if self.cache.repository.async_response(wait=False) is not None:
+                            self.cache.rust_stats_note_async_completion()
+                        item.chunks.append(chunk_entry)
+                        if show_progress:
+                            stats.show_progress(item=item, dt=0.2)
+
+                return
+            else:
+
+                def chunk_processor(chunk):
+                    started_hashing = time.monotonic()
+                    chunk_id, data = cached_hash(chunk, self.key.id_hash)
+                    stats.hashing_time += time.monotonic() - started_hashing
+                    chunk_entry = cache.add_chunk(chunk_id, {}, data, stats=stats, wait=False, ro_type=ROBJ_FILE_STREAM)
+                    if self.cache.repository.async_response(wait=False) is not None:
+                        self.cache.rust_stats_note_async_completion()
+                    return chunk_entry
+
         for chunk in chunk_iter:
             chunk_entry = chunk_processor(chunk)
             item.chunks.append(chunk_entry)

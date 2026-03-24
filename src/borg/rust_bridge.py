@@ -13,6 +13,7 @@ from typing import Optional
 BufferLike = bytes | memoryview
 
 _EXT = None
+_EXT_IMPORT_ERROR = None
 
 
 def _as_bool(value: str | None) -> bool:
@@ -48,15 +49,37 @@ def get_rust_ext():
 
 
 def _load_ext():
-    global _EXT
+    global _EXT, _EXT_IMPORT_ERROR
     if _EXT is not None:
         return _EXT
     try:
         from . import borg_rust_ext  # type: ignore[attr-defined]
-    except Exception:
+    except Exception as exc:
+        _EXT_IMPORT_ERROR = exc
         return None
+    _EXT_IMPORT_ERROR = None
     _EXT = borg_rust_ext
     return _EXT
+
+
+def get_rust_ext_status(required_symbols: tuple[str, ...] = ()) -> tuple[str, str]:
+    """
+    Return extension status as ``(state, details)``.
+
+    States:
+      - loaded: extension imported and all required symbols found
+      - missing_symbol: extension imported but one or more symbols are missing
+      - import_error: extension import failed
+    """
+    ext = _load_ext()
+    if ext is None:
+        if _EXT_IMPORT_ERROR is None:
+            return "import_error", "import of borg.borg_rust_ext failed (unknown reason)"
+        return "import_error", f"import of borg.borg_rust_ext failed: {_EXT_IMPORT_ERROR!r}"
+    missing = [symbol for symbol in required_symbols if not hasattr(ext, symbol)]
+    if missing:
+        return "missing_symbol", f"extension missing required symbol(s): {', '.join(missing)}"
+    return "loaded", "extension loaded"
 
 
 def compress(
