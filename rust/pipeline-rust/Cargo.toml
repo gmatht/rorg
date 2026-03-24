@@ -1,0 +1,23 @@
+[package]
+name = "borg_rust_ext"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "borg_rust_ext"
+crate-type = ["cdylib"]
+
+[dependencies]
+flate2 = "1.1.9"
+lz4 = "1.28.1"
+pyo3 = { version = "0.22", features = ["extension-module"] }
+rayon = "1.10"
+xz2 = "0.1.7"
+zstd = "0.13.3"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+panic = "unwind"
+strip = "debuginfo"

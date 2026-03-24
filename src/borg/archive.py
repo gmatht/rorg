@@ -414,7 +414,8 @@ class CacheChunkBuffer(ChunkBuffer):
             self.key.id_hash(chunk), {}, chunk, stats=self.stats, wait=False, ro_type=ROBJ_ARCHIVE_STREAM
         )
         logger.debug(f"writing item metadata stream chunk {bin_to_hex(id_)}")
-        self.cache.repository.async_response(wait=False)
+        if self.cache.repository.async_response(wait=False) is not None:
+            self.cache.rust_stats_note_async_completion()
         return id_
 
 
@@ -726,7 +727,7 @@ Duration: {0.duration}
             else:
                 raise
         while self.repository.async_response(wait=True) is not None:
-            pass
+            self.cache.rust_stats_note_async_completion()
         self.manifest.archives.create(name, self.id, metadata.time)
         self.manifest.write()
         return metadata
@@ -1216,7 +1217,8 @@ class ChunksProcessor:
                 chunk_id, data = cached_hash(chunk, self.key.id_hash)
                 stats.hashing_time += time.monotonic() - started_hashing
                 chunk_entry = cache.add_chunk(chunk_id, {}, data, stats=stats, wait=False, ro_type=ROBJ_FILE_STREAM)
-                self.cache.repository.async_response(wait=False)
+                if self.cache.repository.async_response(wait=False) is not None:
+                    self.cache.rust_stats_note_async_completion()
                 return chunk_entry
 
         item.chunks = []
@@ -2300,7 +2302,8 @@ class ArchiveRecreater:
         if chunk_id in self.seen_chunks:
             return self.cache.reuse_chunk(chunk_id, size, target.stats)
         chunk_entry = self.cache.add_chunk(chunk_id, {}, data, stats=target.stats, wait=False, ro_type=ROBJ_FILE_STREAM)
-        self.cache.repository.async_response(wait=False)
+        if self.cache.repository.async_response(wait=False) is not None:
+            self.cache.rust_stats_note_async_completion()
         self.seen_chunks.add(chunk_entry.id)
         return chunk_entry
 

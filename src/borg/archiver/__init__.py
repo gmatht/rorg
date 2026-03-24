@@ -258,8 +258,11 @@ class Archiver(
         parser.add_argument("--config", action="config")
         # paths and patterns must have an empty list as default everywhere
         parser.common_options = self.CommonOptions(define_common_options)
+        version_prog = "%(prog)s"
+        if self.prog == "borg" and os.environ.get("BORG_RUST_PIPELINE") == "1":
+            version_prog = "rorg"
         parser.add_argument(
-            "-V", "--version", action="version", version="%(prog)s " + __version__, help="show version number and exit"
+            "-V", "--version", action="version", version=version_prog + " " + __version__, help="show version number and exit"
         )
         parser.add_argument("--cockpit", dest="cockpit", action="store_true", help="Start the Borg TUI")
         parser.common_options.add_common_group(parser, provide_defaults=True)

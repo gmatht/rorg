@@ -15,6 +15,14 @@ def get_chunker(algo, *params, **kw):
         key.derive_key(salt=b"", domain=b"buzhash64", size=32, from_id_key=True) if key is not None else b"\0" * 32
     )
     if algo == "buzhash":
+        from .. import rust_bridge
+        from . import rust_buzhash
+
+        if (
+            rust_bridge.rust_chunker_enabled()
+            and rust_buzhash.rust_chunker_available()
+        ):
+            return rust_buzhash.RustChunker(seed, *params, sparse=sparse)
         return Chunker(seed, *params, sparse=sparse)
     if algo == "buzhash64":
         return ChunkerBuzHash64(bh64_key, *params, sparse=sparse)

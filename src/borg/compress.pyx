@@ -614,3 +614,16 @@ class Compressor:
                 return cls, (255 if cls.name == 'zlib_legacy' else level)
         else:
             raise ValueError('No decompressor for this data found: %r.', data[:2])
+
+
+def rust_compress_params(compressor):
+    """
+    Return ``(ctype, clevel)`` for compressors the Rust extension mirrors, or ``None``
+    for meta-compressors (auto, obfuscate) and zlib_legacy (must use Cython).
+    """
+    c = compressor.compressor if isinstance(compressor, Compressor) else compressor
+    if isinstance(c, (Auto, ObfuscateSize)):
+        return None
+    if isinstance(c, ZLIB_legacy):
+        return None
+    return c.ID, c.level

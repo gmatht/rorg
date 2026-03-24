@@ -5,7 +5,8 @@ from ..crypto.key import PlaintextKey
 from ..helpers.errors import IntegrityError
 from ..repository import Repository
 from ..repoobj import RepoObj, RepoObj1
-from ..compress import LZ4
+from ..compress import Compressor, LZ4, LZ4_COMPRESSOR, get_compressor, rust_compress_params
+from .. import rust_bridge
 
 
 @pytest.fixture
@@ -128,3 +129,134 @@ def test_spoof_archive(key):
     # As Borg always gives the ro_type it intends to read, this should fail:
     with pytest.raises(IntegrityError):
         repo_objs.parse(id, cdata, ro_type=ROBJ_ARCHIVE_META)
+
+
+def test_format_combined_rust_path(monkeypatch, key):
+    repo_objs = RepoObj(key)
+    data = b"combined-path-data" * 1024
+    id = repo_objs.id_hash(data)
+    meta = {"custom": "combined"}
+
+    monkeypatch.setattr(rust_bridge, "rust_enabled", lambda: True)
+    monkeypatch.setattr(rust_bridge, "rust_combined_enabled", lambda: True)
+    monkeypatch.setattr(rust_bridge, "compress_encrypt", lambda *args, **kwargs: (dict(meta), data, data))
+
+    cdata = repo_objs.format(id, dict(meta), data, ro_type=ROBJ_FILE_STREAM)
+    got_meta, got_data = repo_objs.parse(id, cdata, ro_type=ROBJ_FILE_STREAM)
+    assert got_meta["custom"] == "combined"
+    assert got_data == data
+
+
+def test_format_combined_rust_passes_memoryview_without_converting(monkeypatch, key):
+    """Rust bridge should receive memoryview as-is (no eager bytes() copy on Python side)."""
+    repo_objs = RepoObj(key)
+    raw = b"mv-test-data" * 500
+    id = repo_objs.id_hash(raw)
+    meta = {"custom": "mv"}
+    captured = None
+
+    def fake_compress_encrypt(id_b, m, data, jobs=None, ctype=None, clevel=None):
+        nonlocal captured
+        captured = data
+        return (dict(m), raw, raw)
+
+    monkeypatch.setattr(rust_bridge, "rust_enabled", lambda: True)
+    monkeypatch.setattr(rust_bridge, "rust_combined_enabled", lambda: True)
+    monkeypatch.setattr(rust_bridge, "compress_encrypt", fake_compress_encrypt)
+
+    mv = memoryview(raw)
+    repo_objs.format(id, dict(meta), mv, ro_type=ROBJ_FILE_STREAM)
+    assert captured is not None
+    assert type(captured) is memoryview
+
+
+def test_format_combined_rust_passes_bytes(monkeypatch, key):
+    repo_objs = RepoObj(key)
+    raw = b"bytes-test" * 500
+    id = repo_objs.id_hash(raw)
+    meta = {"custom": "b"}
+    captured = None
+
+    def fake_compress_encrypt(id_b, m, data, jobs=None, ctype=None, clevel=None):
+        nonlocal captured
+        captured = data
+        return (dict(m), raw, raw)
+
+    monkeypatch.setattr(rust_bridge, "rust_enabled", lambda: True)
+    monkeypatch.setattr(rust_bridge, "rust_combined_enabled", lambda: True)
+    monkeypatch.setattr(rust_bridge, "compress_encrypt", fake_compress_encrypt)
+
+    repo_objs.format(id, dict(meta), raw, ro_type=ROBJ_FILE_STREAM)
+    assert captured is not None
+    assert type(captured) is bytes
+
+
+def test_rust_bridge_pipeline_timing_helpers():
+    """Smoke-test: optional extension returns None when unavailable; else tuple of three floats."""
+    got = rust_bridge.pipeline_timing_get()
+    assert got is None or (isinstance(got, tuple) and len(got) == 3)
+    rust_bridge.pipeline_timing_reset()
+
+
+def test_rust_bridge_parallel_stats_helpers():
+    got = rust_bridge.pipeline_parallel_stats_get()
+    assert got is None or (isinstance(got, tuple) and len(got) == 6)
+    rust_bridge.pipeline_timing_reset()
+
+
+def test_rust_bridge_concurrency_stats_helpers():
+    got = rust_bridge.pipeline_concurrency_stats_get()
+    assert got is None or (isinstance(got, tuple) and len(got) == 3)
+    rust_bridge.pipeline_concurrency_stats_reset()
+    rust_bridge.pipeline_concurrency_inflight_update(0)
+
+
+def test_rust_bridge_encrypt_not_implemented_falls_back(monkeypatch):
+    class _FakeExt:
+        def encrypt(self, *_args, **_kwargs):
+            raise NotImplementedError
+
+    monkeypatch.setattr(rust_bridge, "_EXT", _FakeExt())
+    assert rust_bridge.encrypt(b"id", b"payload") is None
+
+
+def test_rust_bridge_combined_not_implemented_falls_back(monkeypatch):
+    class _FakeExt:
+        def compress_encrypt(self, *_args, **_kwargs):
+            raise NotImplementedError
+
+    monkeypatch.setattr(rust_bridge, "_EXT", _FakeExt())
+    got = rust_bridge.compress_encrypt(
+        b"id",
+        {},
+        b"payload",
+        jobs=1,
+        ctype=0x01,
+        clevel=255,
+    )
+    assert got is None
+
+
+def test_rust_compress_params():
+    assert rust_compress_params(LZ4_COMPRESSOR) == (0x01, 255)
+    assert rust_compress_params(Compressor(name="zstd", level=3)) == (0x03, 3)
+    assert rust_compress_params(Compressor(name="lzma", level=6)) == (0x02, 6)
+    assert rust_compress_params(Compressor(name="none")) == (0x00, 255)
+    assert rust_compress_params(get_compressor("auto", compressor=get_compressor("lz4"))) is None
+    assert rust_compress_params(get_compressor("obfuscate", level=3, compressor=get_compressor("lz4"))) is None
+
+
+def test_format_rust_compress_roundtrip(monkeypatch, key):
+    if rust_bridge.rust_buzhash(b"x", 0) is None:
+        pytest.skip("borg_rust_ext not available")
+    monkeypatch.setenv("BORG_RUST_PIPELINE", "1")
+    monkeypatch.setenv("BORG_RUST_COMPRESS", "1")
+    monkeypatch.setenv("BORG_RUST_ENCRYPT", "0")
+    repo_objs = RepoObj(key)
+    repo_objs.compressor = Compressor(name="zstd", level=3)
+    data = b"The quick brown fox jumps over the lazy dog.\n" * 500
+    chunk_id = repo_objs.id_hash(data)
+    cdata = repo_objs.format(chunk_id, {}, data, ro_type=ROBJ_FILE_STREAM)
+    got_meta, got_plain = repo_objs.parse(chunk_id, cdata, ro_type=ROBJ_FILE_STREAM)
+    assert got_plain == data
+    assert got_meta["ctype"] == 0x03

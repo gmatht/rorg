@@ -6,7 +6,7 @@ from xxhash import xxh64
 from .constants import *  # NOQA
 from .helpers import msgpack, workarounds
 from .helpers.errors import IntegrityError
-from .compress import Compressor, LZ4_COMPRESSOR, get_compressor
+from .compress import Compressor, LZ4_COMPRESSOR, get_compressor, rust_compress_params
 from . import rust_bridge
 
 # Workaround for lost passphrase or key in "authenticated" or "authenticated-blake2" mode
@@ -40,7 +40,7 @@ class RepoObj:
         self,
         id: bytes,
         meta: dict,
-        data: bytes,
+        data: bytes | memoryview,
         compress: bool = True,
         size: int = None,
         ctype: int = None,
@@ -56,23 +56,30 @@ class RepoObj:
         assert compress or size is not None and ctype is not None and clevel is not None
         if compress:
             assert size is None or size == len(data)
-            data_bytes = bytes(data) if not isinstance(data, bytes) else data
+            # Pass buffer through to Rust to avoid an extra copy for plain `bytes`.
             if rust_bridge.rust_enabled() and rust_bridge.rust_combined_enabled():
-                combined = rust_bridge.compress_encrypt(id, meta, data_bytes, jobs=self.jobs)
+                rp = rust_compress_params(self.compressor)
+                combined = (
+                    rust_bridge.compress_encrypt(id, meta, data, jobs=self.jobs, ctype=rp[0], clevel=rp[1])
+                    if rp is not None
+                    else None
+                )
                 if combined is not None:
-                    meta, data_compressed, data_encrypted, meta_packed = combined
-                    if isinstance(meta_packed, bytes):
-                        meta_encrypted = self.key.encrypt(id, meta_packed)
-                        hdr = self.ObjHeader(
-                            len(meta_encrypted),
-                            len(data_encrypted),
-                            xxh64(meta_encrypted).digest(),
-                            xxh64(data_encrypted).digest(),
-                        )
-                        return self.obj_header.pack(*hdr) + meta_encrypted + data_encrypted
+                    meta, data_compressed, data_encrypted = combined
+                    meta_packed = msgpack.packb(meta)
+                    meta_encrypted = self.key.encrypt(id, meta_packed)
+                    hdr = self.ObjHeader(
+                        len(meta_encrypted),
+                        len(data_encrypted),
+                        xxh64(meta_encrypted).digest(),
+                        xxh64(data_encrypted).digest(),
+                    )
+                    return self.obj_header.pack(*hdr) + meta_encrypted + data_encrypted
             rust_compressed = None
             if rust_bridge.rust_enabled() and rust_bridge.rust_compress_enabled():
-                rust_compressed = rust_bridge.compress(meta, data_bytes, jobs=self.jobs)
+                rp = rust_compress_params(self.compressor)
+                if rp is not None:
+                    rust_compressed = rust_bridge.compress(meta, data, jobs=self.jobs, ctype=rp[0], clevel=rp[1])
             if rust_compressed is not None:
                 meta, data_compressed = rust_compressed
             else:

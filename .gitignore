@@ -34,3 +34,5 @@ test-results.xml
 .vagrant
 .DS_Store
 .venv-wsl
+local
+rust/pipeline-rust/target

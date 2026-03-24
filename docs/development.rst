@@ -277,7 +277,8 @@ Rust pipeline migration notes (experimental)
 --------------------------------------------
 
 For the in-progress Rust `compress -> encrypt` migration toggles and jobs control,
-see ``docs/misc/rust_pipeline.rst``.
+see ``docs/misc/rust_pipeline.rst``. Building the optional ``borg_rust_ext`` crate is
+described in ``docs/development/rust_build.rst``.
 
 
 This project utilizes pre-commit to format and lint code before it is committed.

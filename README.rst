@@ -1,6 +1,8 @@
 This is borg2!
 --------------
 
+Rust extension usage guide: see ``Rust.md``.
+
 Please note that this is the README for borg2 / master branch.
 
 For the stable version's docs, please see here:

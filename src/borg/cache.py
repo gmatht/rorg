@@ -20,6 +20,7 @@ files_cache_logger = create_logger("borg.debug.files_cache")
 
 from borgstore.store import ItemInfo
 
+from . import rust_bridge
 from .constants import CACHE_README, FILES_CACHE_MODE_DISABLED, ROBJ_FILE_STREAM, TIME_DIFFERS2_NS
 from .hashindex import ChunkIndex, ChunkIndexEntry
 from .helpers import Error
@@ -856,6 +857,21 @@ class ChunksMixin:
         self.refresh_td = timedelta(seconds=60)
         self.chunks_cache_last_write = datetime.now(timezone.utc)
         self.chunks_cache_write_td = timedelta(seconds=600)
+        self._rust_tasks_in_flight = 0
+
+    def rust_stats_reset(self):
+        self._rust_tasks_in_flight = 0
+        rust_bridge.pipeline_concurrency_stats_reset()
+        rust_bridge.pipeline_concurrency_inflight_update(0)
+
+    def rust_stats_note_async_issue(self):
+        self._rust_tasks_in_flight += 1
+        rust_bridge.pipeline_concurrency_inflight_update(self._rust_tasks_in_flight)
+
+    def rust_stats_note_async_completion(self):
+        if self._rust_tasks_in_flight > 0:
+            self._rust_tasks_in_flight -= 1
+        rust_bridge.pipeline_concurrency_inflight_update(self._rust_tasks_in_flight)
 
     @property
     def chunks(self):
@@ -913,6 +929,8 @@ class ChunksMixin:
             id, meta, data, compress=compress, size=size, ctype=ctype, clevel=clevel, ro_type=ro_type
         )
         self.repository.put(id, cdata, wait=wait)
+        if not wait:
+            self.rust_stats_note_async_issue()
         self.last_refresh_dt = now  # .put also refreshed the lock
         self.chunks.add(id, size)
         stats.update(size, not exists)

@@ -1,0 +1,39 @@
+# Optional CI for the experimental Rust extension (does not gate Python CI).
+
+name: Rust pipeline
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'rust/pipeline-rust/**'
+      - '.github/workflows/rust-pipeline.yml'
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'rust/pipeline-rust/**'
+      - '.github/workflows/rust-pipeline.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  cargo:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: cargo clippy
+        working-directory: rust/pipeline-rust
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: cargo test
+        working-directory: rust/pipeline-rust
+        run: cargo test

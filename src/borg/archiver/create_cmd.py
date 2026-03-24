@@ -10,6 +10,7 @@ from io import TextIOWrapper
 
 from ._common import with_repository, Highlander
 from .. import helpers
+from .. import rust_bridge
 from ..archive import Archive, is_special
 from ..archive import BackupError, BackupOSError, BackupItemExcluded, backup_io, OsOpen, stat_update_check
 from ..archive import FilesystemObjectProcessors, MetadataCollector, ChunksProcessor
@@ -221,6 +222,21 @@ class CreateMixIn:
                             json_print(basic_json_data(manifest, cache=cache, extra={"archive": archive}))
                         else:
                             log_multi(str(archive), str(archive.stats), logger=logging.getLogger("borg.output.stats"))
+                    if args.rust_stats:
+                        rust_stats = rust_bridge.pipeline_concurrency_stats_get()
+                        if rust_stats is None:
+                            logger = logging.getLogger("borg.output.stats")
+                            log_multi("Rust concurrency stats unavailable (extension not loaded).", logger=logger)
+                        else:
+                            active_ms, avg_in_flight, max_in_flight = rust_stats
+                            logger = logging.getLogger("borg.output.stats")
+                            log_multi(
+                                "Rust Concurrency Stats:",
+                                f"Active time (ms): {active_ms:.3f}",
+                                f"Average tasks in flight: {avg_in_flight:.3f}",
+                                f"Maximum tasks in flight: {max_in_flight}",
+                                logger=logger,
+                            )
 
         self.output_filter = args.output_filter
         self.output_list = args.output_list
@@ -273,6 +289,8 @@ class CreateMixIn:
                         wc=None,
                     )
                     args.files_changed = "mtime"
+                if args.rust_stats:
+                    cache.rust_stats_reset()
                 fso = FilesystemObjectProcessors(
                     metadata_collector=metadata_collector,
                     cache=cache,
@@ -798,6 +816,12 @@ class CreateMixIn:
         )
         subparser.add_argument(
             "-s", "--stats", dest="stats", action="store_true", help="print statistics for the created archive"
+        )
+        subparser.add_argument(
+            "--rust-stats",
+            dest="rust_stats",
+            action="store_true",
+            help="print Rust pipeline concurrency stats (active ms, average and max tasks in flight)",
         )
 
         subparser.add_argument(
