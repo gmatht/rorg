@@ -12,21 +12,28 @@ def test_unknown_command_typo_suggests_fuzzy_match(cmd_fixture):
     exit_code, output = cmd_fixture("repo-creat")
     assert exit_code == 2
     assert "Maybe you meant `repo-create` not `repo-creat`:" in output
-    assert "\tborg -r REPO repo-create -e repokey-aes-ocb" in output
+    assert "\tborg repo-create" in output
 
 
 def test_unknown_command_typo_list(cmd_fixture):
     exit_code, output = cmd_fixture("lst")
     assert exit_code == 2
     assert "Maybe you meant `list` not `lst`:" in output
-    assert "\tborg -r REPO list ARCHIVE" in output
+    assert "\tborg list" in output
+
+
+def test_fuzzy_typo_preserves_following_args(cmd_fixture):
+    exit_code, output = cmd_fixture("creat", "foo", "--stats")
+    assert exit_code == 2
+    assert "Maybe you meant `create` not `creat`:" in output
+    assert "\tborg create foo --stats" in output
 
 
 def test_legacy_rm_synonym(cmd_fixture):
     exit_code, output = cmd_fixture("rm")
     assert exit_code == 2
     assert "Maybe you meant `delete` not `rm`:" in output
-    assert "\tborg -r REPO delete ARCHIVE_OR_AID" in output
+    assert "\tborg delete" in output
 
 
 def test_legacy_rm_synonym_preserves_trailing_tokens_in_delete_example(cmd_fixture, tmp_path):
@@ -36,7 +43,7 @@ def test_legacy_rm_synonym_preserves_trailing_tokens_in_delete_example(cmd_fixtu
     assert exit_code == 2
     assert "Maybe you meant `delete` not `rm`:" in output
     assert "ARCHIVE_OR_AID" not in output
-    assert "\tborg -r REPO delete dsfasdfsdfsdf" in output
+    assert f"\tborg -r {repo} delete dsfasdfsdfsdf" in output
 
 
 def test_rm_synonym_example_includes_argv_tail(monkeypatch):
@@ -51,7 +58,7 @@ def test_rm_synonym_example_includes_argv_tail(monkeypatch):
     assert hint is not None
     assert "Maybe you meant `delete` not `rm`:" in hint
     assert "ARCHIVE_OR_AID" not in hint
-    assert "\tborg -r REPO delete dsfasdfsdfsdf" in hint
+    assert "\tborg -r /tmp/borg/outC delete dsfasdfsdfsdf" in hint
 
 
 def test_lst_typo_example_includes_argv_tail(monkeypatch):
@@ -66,7 +73,7 @@ def test_lst_typo_example_includes_argv_tail(monkeypatch):
     assert hint is not None
     assert "Maybe you meant `list` not `lst`:" in hint
     assert "ARCHIVE" not in hint
-    assert "\tborg -r REPO list my-archive" in hint
+    assert "\tborg -r /r list my-archive" in hint
 
 
 def test_restore_synonym_example_includes_argv_tail(monkeypatch):
@@ -103,14 +110,14 @@ def test_legacy_clean_synonym(cmd_fixture):
     exit_code, output = cmd_fixture("clean")
     assert exit_code == 2
     assert "Maybe you meant `compact` not `clean`:" in output
-    assert "\tborg -r REPO compact" in output
+    assert "\tborg compact" in output
 
 
 def test_legacy_restore_synonym(cmd_fixture):
     exit_code, output = cmd_fixture("restore")
     assert exit_code == 2
     assert "Maybe you meant `undelete` not `restore`:" in output
-    assert "\tborg -r REPO undelete …" in output
+    assert "\tborg undelete" in output
 
 
 def test_legacy_init_synonym(cmd_fixture, tmp_path):
@@ -118,7 +125,7 @@ def test_legacy_init_synonym(cmd_fixture, tmp_path):
     exit_code, output = cmd_fixture("--repo", repo, "init", "-e", "none")
     assert exit_code == 2
     assert "Maybe you meant `repo-create` not `init`:" in output
-    assert "\tborg -r REPO repo-create -e repokey-aes-ocb" in output
+    assert f"\tborg --repo {repo} repo-create -e none" in output
 
 
 def test_legacy_rcreate_synonym(cmd_fixture, tmp_path):
@@ -126,7 +133,7 @@ def test_legacy_rcreate_synonym(cmd_fixture, tmp_path):
     exit_code, output = cmd_fixture("--repo", repo, "rcreate", "-e", "none")
     assert exit_code == 2
     assert "Maybe you meant `repo-create` not `rcreate`:" in output
-    assert "\tborg -r REPO repo-create -e repokey-aes-ocb" in output
+    assert f"\tborg --repo {repo} repo-create -e none" in output
 
 
 def test_legacy_repocreate_synonym(cmd_fixture, tmp_path):
@@ -134,7 +141,7 @@ def test_legacy_repocreate_synonym(cmd_fixture, tmp_path):
     exit_code, output = cmd_fixture("--repo", repo, "repocreate", "-e", "none")
     assert exit_code == 2
     assert "Maybe you meant `repo-create` not `repocreate`:" in output
-    assert "\tborg -r REPO repo-create -e repokey-aes-ocb" in output
+    assert f"\tborg --repo {repo} repo-create -e none" in output
 
 
 def test_repo_create_missing_encryption_shows_available_modes(cmd_fixture, tmp_path):

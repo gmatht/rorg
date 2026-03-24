@@ -95,6 +95,7 @@ unchanged.
 """
 
 import difflib
+import os
 import re
 import shlex
 import sys
@@ -268,10 +269,12 @@ class ArgumentParser(_ArgumentParser):
             canonical = candidates[0]
         if canonical == invalid:
             return None
-        example = _TOP_COMMAND_EXAMPLES.get(canonical, f"borg -r REPO {canonical}")
-        example = _apply_argv_tail_to_example(
-            canonical, example, _argv_tail_after_invalid_choice(invalid)
-        )
+        example = _corrected_command_line_for_invalid_subcommand(invalid, canonical)
+        if example is None:
+            example = _TOP_COMMAND_EXAMPLES.get(canonical, f"borg -r REPO {canonical}")
+            example = _apply_argv_tail_to_example(
+                canonical, example, _argv_tail_after_invalid_choice(invalid)
+            )
         return f"Maybe you meant `{canonical}` not `{invalid}`:\n\t{example}"
 
     def _common_fix_hints(self, message: str) -> list[str]:
