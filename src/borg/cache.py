@@ -1,5 +1,8 @@
 import configparser
 import io
+import threading
+import queue
+import concurrent.futures
 import os
 import shutil
 import stat
@@ -864,7 +867,10 @@ class ChunksMixin:
         return self._chunks
 
     def seen_chunk(self, id, size=None):
+        self._drain_completed_compressions()
         entry = self.chunks.get(id)
+        if entry is None and self._compression_pending(id):
+            return True
         entry_exists = entry is not None
         if entry_exists and size is not None:
             if entry.size == 0:
@@ -880,6 +886,104 @@ class ChunksMixin:
         assert isinstance(size, int) and size > 0
         stats.update(size, False)
         return ChunkListEntry(id, size)
+
+    def _compression_threads(self):
+        return int(os.environ.get("BORG_COMPRESSION_THREADS", "0"))
+
+    def _compression_enabled(self, *, compress):
+        return compress and self._compression_threads() > 1
+
+    def _ensure_compression_executor(self, threads):
+        executor = getattr(self, "_compress_executor", None)
+        if executor is None:
+            inflight = max(1, int(os.environ.get("BORG_COMPRESSION_INFLIGHT", str(threads * 2))))
+            self._compress_executor = concurrent.futures.ThreadPoolExecutor(max_workers=threads)
+            self._compress_semaphore = threading.Semaphore(inflight)
+            self._compress_lock = threading.Lock()
+            self._compress_results = queue.Queue()
+            self._compress_futures = {}
+            self._compress_pending = set()
+            executor = self._compress_executor
+        return executor
+
+    def _compression_pending(self, id):
+        lock = getattr(self, "_compress_lock", None)
+        pending = getattr(self, "_compress_pending", None)
+        if lock is None or pending is None:
+            return False
+        with lock:
+            return id in pending
+
+    def _schedule_compression(self, id, meta, data, *, size, ctype, clevel, ro_type):
+        threads = self._compression_threads()
+        executor = self._ensure_compression_executor(threads)
+        sem = self._compress_semaphore
+        while not sem.acquire(blocking=False):
+            self._drain_completed_compressions(wait=True)
+
+        meta = dict(meta)
+        if not isinstance(data, bytes):
+            data = bytes(data)
+
+        def _compress_worker(id, meta, data, size, ctype, clevel, ro_type):
+            return self.repo_objs.format(
+                id, meta, data, compress=True, size=size, ctype=ctype, clevel=clevel, ro_type=ro_type
+            )
+
+        future = executor.submit(_compress_worker, id, meta, data, size, ctype, clevel, ro_type)
+        with self._compress_lock:
+            self._compress_pending.add(id)
+            self._compress_futures[id] = {"future": future, "size": size}
+        future.add_done_callback(lambda future, id=id: self._compress_results.put(id))
+        return future
+
+    def _finish_compression(self, id):
+        lock = getattr(self, "_compress_lock", None)
+        futures = getattr(self, "_compress_futures", None)
+        if lock is None or futures is None:
+            return False
+
+        with lock:
+            context = futures.get(id)
+        if context is None:
+            return False
+
+        future = context["future"]
+        size = context["size"]
+        try:
+            cdata = future.result()
+            self.repository.put(id, cdata, wait=True)
+            self.last_refresh_dt = datetime.now(timezone.utc)
+            self.chunks.add(id, size)
+        finally:
+            with lock:
+                futures.pop(id, None)
+                self._compress_pending.discard(id)
+            self._compress_semaphore.release()
+        return True
+
+    def _drain_completed_compressions(self, wait=False):
+        results = getattr(self, "_compress_results", None)
+        lock = getattr(self, "_compress_lock", None)
+        futures = getattr(self, "_compress_futures", None)
+        if results is None or lock is None or futures is None:
+            return
+
+        completed_ids = []
+        if wait:
+            with lock:
+                if not futures:
+                    return
+            completed_ids.append(results.get())
+
+        while True:
+            try:
+                completed_ids.append(results.get_nowait())
+            except queue.Empty:
+                break
+
+        for id in completed_ids:
+            self._finish_compression(id)
 
     def add_chunk(
         self,
@@ -902,13 +1006,33 @@ class ChunksMixin:
             else:
                 raise ValueError("when giving compressed data for a chunk, the uncompressed size must be given also")
         now = datetime.now(timezone.utc)
+        if self._compression_enabled(compress=compress):
+            self._drain_completed_compressions()
         self._maybe_write_chunks_cache(now)
+
+        if self._compression_pending(id):
+            if wait:
+                self._finish_compression(id)
+            else:
+                self.refresh_lock(now)
+            return self.reuse_chunk(id, size, stats)
+
         exists = self.seen_chunk(id, size)
         if exists:
             # if borg create is processing lots of unchanged files (no content and not metadata changes),
             # there could be a long time without any repository operations and the repo lock would get stale.
             self.refresh_lock(now)
             return self.reuse_chunk(id, size, stats)
+        if self._compression_enabled(compress=compress):
+            self._schedule_compression(id, meta, data, size=size, ctype=ctype, clevel=clevel, ro_type=ro_type)
+            if wait:
+                self._finish_compression(id)
+                stats.update(size, True)
+            else:
+                stats.update(size, True)
+                self.refresh_lock(now)
+            return ChunkListEntry(id, size)
+
         cdata = self.repo_objs.format(
             id, meta, data, compress=compress, size=size, ctype=ctype, clevel=clevel, ro_type=ro_type
         )
@@ -1012,6 +1136,17 @@ class AdHocWithFilesCache(FilesCacheMixin, ChunksMixin):
     def close(self):
         self.security_manager.save(self.manifest, self.key)
         pi = ProgressIndicatorMessage(msgid="cache.close")
+        executor = getattr(self, "_compress_executor", None)
+        if executor is not None:
+            pi.output("Finalizing pending compressions")
+            while True:
+                with self._compress_lock:
+                    if not self._compress_futures:
+                        break
+                self._drain_completed_compressions(wait=True)
+            executor.shutdown(wait=True)
+            self._drain_completed_compressions()
+            self._compress_executor = None
         if self._files is not None:
             pi.output("Saving files cache")
             integrity_data = self._write_files_cache(self._files)

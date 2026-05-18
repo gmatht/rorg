@@ -48,6 +48,14 @@ class TestAdHocWithFilesCache:
         assert cache.add_chunk(H(1), {}, b"5678", stats=Statistics()) == (H(1), 4)
         assert cache.reuse_chunk(H(1), 4, Statistics()) == (H(1), 4)
 
+    def test_seen_chunk_pending_threaded_compression(self, cache, monkeypatch):
+        monkeypatch.setenv("BORG_COMPRESSION_THREADS", "2")
+        stats = Statistics()
+
+        assert cache.add_chunk(H(3), {}, b"5678", stats=stats, wait=False) == (H(3), 4)
+        assert cache.seen_chunk(H(3), 4)
+        assert stats.usize == 4
+
     def test_files_cache(self, cache):
         st = os.stat(".")
         assert cache.file_known_and_unchanged(b"foo", bytes(32), st) == (False, None)
