@@ -1,0 +1,134 @@
+Benchmark is on a Intel(R) Core(TM) i7-10875H with a nvme ssd.
+We see that 1x thread SMP is similar to original serial code.
+The CPU is a 8 CPU 16 thread CPU. Exceeding the number of CPUS
+can improve performance, be we see little point in exceeding
+the number of CPU threads (i.e. 32x does not outperform 16x).
+
+
+Summary
+case           compression    mode    secs     MiB/s    repo size
+------------------------------------------------------------------
+zstd-default   zstd,3         serial    10.90   147.84    292.8 MiB
+zstd-default   zstd,3         1x        10.64   151.42    292.8 MiB
+zstd-default   zstd,3         2x         7.36   219.03    292.8 MiB
+zstd-default   zstd,3         4x         7.40   217.71    292.8 MiB
+zstd-default   zstd,3         8x         7.47   215.74    292.8 MiB
+zstd-default   zstd,3         16x        7.21   223.57    292.8 MiB
+zstd-default   zstd,3         32x        7.17   224.74    292.8 MiB
+zstd-med       zstd,10        serial    30.29    53.20    272.5 MiB
+zstd-med       zstd,10        1x        32.50    49.58    272.5 MiB
+zstd-med       zstd,10        2x        14.28   112.86    272.5 MiB
+zstd-med       zstd,10        4x        10.41   154.84    272.5 MiB
+zstd-med       zstd,10        8x         9.93   162.29    272.5 MiB
+zstd-med       zstd,10        16x       10.24   157.32    272.5 MiB
+zstd-med       zstd,10        32x       10.30   156.50    272.5 MiB
+zstd-high      zstd,19        serial   236.25     6.82    249.6 MiB
+zstd-high      zstd,19        1x       238.74     6.75    249.6 MiB
+zstd-high      zstd,19        2x       118.32    13.62    249.6 MiB
+zstd-high      zstd,19        4x        67.71    23.80    249.6 MiB
+zstd-high      zstd,19        8x        45.09    35.74    249.6 MiB
+zstd-high      zstd,19        16x       34.97    46.08    249.6 MiB
+zstd-high      zstd,19        32x       35.43    45.47    249.6 MiB
+zstd-ultra     zstd,22        serial   260.61     6.18    249.6 MiB
+zstd-ultra     zstd,22        1x       264.90     6.08    249.6 MiB
+zstd-ultra     zstd,22        2x       131.13    12.29    249.6 MiB
+zstd-ultra     zstd,22        4x        75.76    21.27    249.6 MiB
+zstd-ultra     zstd,22        8x        47.75    33.75    249.6 MiB
+zstd-ultra     zstd,22        16x       38.01    42.39    249.6 MiB
+zstd-ultra     zstd,22        32x       38.45    41.91    249.6 MiB
+lzma-fastest   lzma,1         serial    69.79    23.09    250.8 MiB
+lzma-fastest   lzma,1         1x        71.21    22.63    250.8 MiB
+lzma-fastest   lzma,1         2x        33.26    48.45    250.8 MiB
+lzma-fastest   lzma,1         4x        19.50    82.61    250.8 MiB
+lzma-fastest   lzma,1         8x        14.12   114.13    250.8 MiB
+lzma-fastest   lzma,1         16x       13.34   120.78    250.8 MiB
+lzma-fastest   lzma,1         32x       13.06   123.39    250.8 MiB
+lzma-faster    lzma,2         serial    87.66    18.38    247.8 MiB
+lzma-faster    lzma,2         1x        89.28    18.05    247.8 MiB
+lzma-faster    lzma,2         2x        41.18    39.13    247.8 MiB
+lzma-faster    lzma,2         4x        24.33    66.22    247.8 MiB
+lzma-faster    lzma,2         8x        16.96    95.01    247.8 MiB
+lzma-faster    lzma,2         16x       14.13   114.02    247.8 MiB
+lzma-faster    lzma,2         32x       14.69   109.67    247.8 MiB
+lzma-fast      lzma,4         serial   184.37     8.74    235.7 MiB
+lzma-fast      lzma,4         1x       188.84     8.53    235.7 MiB
+lzma-fast      lzma,4         2x        88.66    18.17    235.7 MiB
+lzma-fast      lzma,4         4x        51.72    31.16    235.7 MiB
+lzma-fast      lzma,4         8x        32.71    49.27    235.7 MiB
+lzma-fast      lzma,4         16x       24.78    65.02    235.7 MiB
+lzma-fast      lzma,4         32x       24.98    64.50    235.7 MiB
+lzma-brisk     lzma,5         serial   223.46     7.21    232.4 MiB
+lzma-brisk     lzma,5         1x       221.97     7.26    232.4 MiB
+lzma-brisk     lzma,5         2x       106.65    15.11    232.4 MiB
+lzma-brisk     lzma,5         4x        61.88    26.04    232.4 MiB
+lzma-brisk     lzma,5         8x        40.21    40.07    232.4 MiB
+lzma-brisk     lzma,5         16x       30.61    52.63    232.4 MiB
+lzma-brisk     lzma,5         32x       30.74    52.43    232.4 MiB
+lzma-default   lzma,6         serial   248.23     6.49    231.5 MiB
+lzma-default   lzma,6         1x       243.53     6.62    231.5 MiB
+lzma-default   lzma,6         2x       119.85    13.44    231.5 MiB
+lzma-default   lzma,6         4x        68.70    23.46    231.5 MiB
+lzma-default   lzma,6         8x        43.76    36.82    231.5 MiB
+lzma-default   lzma,6         16x       33.98    47.42    231.5 MiB
+lzma-default   lzma,6         32x       34.21    47.10    231.5 MiB
+lzma-max       lzma,9         serial   260.51     6.19    231.5 MiB
+lzma-max       lzma,9         1x       257.81     6.25    231.5 MiB
+lzma-max       lzma,9         2x       128.34    12.56    231.5 MiB
+lzma-max       lzma,9         4x        76.11    21.17    231.5 MiB
+lzma-max       lzma,9         8x        51.83    31.09    231.5 MiB
+lzma-max       lzma,9         16x       42.25    38.14    231.5 MiB
+lzma-max       lzma,9         32x       44.57    36.15    231.5 MiB
+
+Speedup vs 1x
+case           mode    compression    smp/1x    size ratio
+-------------------------------------------------------------
+zstd-default   2x     zstd,3             1.45x  1.0000
+zstd-default   4x     zstd,3             1.44x  1.0000
+zstd-default   8x     zstd,3             1.42x  1.0000
+zstd-default   16x    zstd,3             1.48x  1.0000
+zstd-default   32x    zstd,3             1.48x  1.0000
+zstd-med       2x     zstd,10            2.28x  1.0000
+zstd-med       4x     zstd,10            3.12x  1.0000
+zstd-med       8x     zstd,10            3.27x  1.0000
+zstd-med       16x    zstd,10            3.17x  1.0000
+zstd-med       32x    zstd,10            3.16x  1.0000
+zstd-high      2x     zstd,19            2.02x  1.0000
+zstd-high      4x     zstd,19            3.53x  1.0000
+zstd-high      8x     zstd,19            5.30x  1.0000
+zstd-high      16x    zstd,19            6.83x  1.0000
+zstd-high      32x    zstd,19            6.74x  1.0000
+zstd-ultra     2x     zstd,22            2.02x  1.0000
+zstd-ultra     4x     zstd,22            3.50x  1.0000
+zstd-ultra     8x     zstd,22            5.55x  1.0000
+zstd-ultra     16x    zstd,22            6.97x  1.0000
+zstd-ultra     32x    zstd,22            6.89x  1.0000
+lzma-fastest   2x     lzma,1             2.14x  1.0000
+lzma-fastest   4x     lzma,1             3.65x  1.0000
+lzma-fastest   8x     lzma,1             5.04x  1.0000
+lzma-fastest   16x    lzma,1             5.34x  1.0000
+lzma-fastest   32x    lzma,1             5.45x  1.0000
+lzma-faster    2x     lzma,2             2.17x  1.0000
+lzma-faster    4x     lzma,2             3.67x  1.0000
+lzma-faster    8x     lzma,2             5.26x  1.0000
+lzma-faster    16x    lzma,2             6.32x  1.0000
+lzma-faster    32x    lzma,2             6.08x  1.0000
+lzma-fast      2x     lzma,4             2.13x  1.0000
+lzma-fast      4x     lzma,4             3.65x  1.0000
+lzma-fast      8x     lzma,4             5.77x  1.0000
+lzma-fast      16x    lzma,4             7.62x  1.0000
+lzma-fast      32x    lzma,4             7.56x  1.0000
+lzma-brisk     2x     lzma,5             2.08x  1.0000
+lzma-brisk     4x     lzma,5             3.59x  1.0000
+lzma-brisk     8x     lzma,5             5.52x  1.0000
+lzma-brisk     16x    lzma,5             7.25x  1.0000
+lzma-brisk     32x    lzma,5             7.22x  1.0000
+lzma-default   2x     lzma,6             2.03x  1.0000
+lzma-default   4x     lzma,6             3.54x  1.0000
+lzma-default   8x     lzma,6             5.56x  1.0000
+lzma-default   16x    lzma,6             7.17x  1.0000
+lzma-default   32x    lzma,6             7.12x  1.0000
+lzma-max       2x     lzma,9             2.01x  1.0000
+lzma-max       4x     lzma,9             3.39x  1.0000
+lzma-max       8x     lzma,9             4.97x  1.0000
+lzma-max       16x    lzma,9             6.10x  1.0000
+lzma-max       32x    lzma,9             5.78x  1.0000
